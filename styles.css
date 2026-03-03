@@ -42,11 +42,11 @@ body.light-mode {
   --card-border: rgba(0, 0, 0, 0.2);
   --soft-border: rgba(0, 0, 0, 0.18);
   --field-bg: rgba(255, 255, 255, 0.85);
-  --muted-bg: rgba(255, 255, 255, 0.65);
+  --muted-bg: rgba(245, 245, 245, 0.9);
 }
 
 body.light-mode .bg-video {
-  filter: grayscale(100%) contrast(0.85) brightness(0.95);
+  filter: grayscale(30%) contrast(1.05) brightness(1.08);
 }
 
 body::before,
@@ -74,6 +74,13 @@ body::after {
   opacity: 0.2;
   animation: gridDrift 18s linear infinite;
   z-index: -1;
+}
+
+body.light-mode::after {
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
+  opacity: 0.12;
 }
 
 @keyframes bgShift {
@@ -193,12 +200,12 @@ h1 {
 
 .upload-box {
   display: block;
-  border: 2px dashed rgba(255, 255, 255, 0.45);
+  border: 2px dashed var(--soft-border);
   padding: 34px 20px;
   border-radius: 15px;
   cursor: pointer;
   transition: 0.3s;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--field-bg);
 }
 
 .upload-box input {
@@ -206,13 +213,13 @@ h1 {
 }
 
 .upload-box:hover {
-  border-color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--text);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .upload-box.dragover {
-  border-color: #fff;
-  background: rgba(255, 255, 255, 0.18);
+  border-color: var(--text);
+  background: rgba(255, 255, 255, 0.16);
   animation: dropzoneBlast 0.7s ease;
 }
 
@@ -242,10 +249,10 @@ h1 {
 
 .camera-panel {
   margin-top: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--soft-border);
   border-radius: 12px;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--muted-bg);
   animation: panelReveal 0.35s ease;
 }
 
