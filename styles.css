@@ -6,7 +6,7 @@
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100svh;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -79,6 +79,7 @@ body::after {
   position: relative;
   z-index: 1;
   margin: 18px 0;
+  max-height: calc(100svh - 24px);
 }
 
 h1 {
@@ -105,6 +106,8 @@ h1 {
     0 26px 60px rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
   transition: transform 0.35s ease, box-shadow 0.35s ease;
+  max-height: min(76svh, 880px);
+  overflow-y: auto;
 }
 
 .card.file-selected {
@@ -443,6 +446,12 @@ button.convert[disabled]::before {
   .container {
     width: min(700px, 100%);
     margin: 0 auto;
+    max-height: none;
+  }
+
+  .card {
+    max-height: none;
+    overflow-y: visible;
   }
 }
 
@@ -464,6 +473,8 @@ button.convert[disabled]::before {
     margin-top: 18px;
     padding: 16px;
     border-radius: 16px;
+    max-height: none;
+    overflow-y: visible;
   }
 
   .upload-box {
@@ -499,5 +510,50 @@ button.convert[disabled]::before {
     width: 100%;
     min-height: 46px;
     font-size: 0.98rem;
+  }
+}
+
+/* Landscape phones / short-height screens */
+@media (max-height: 560px) and (orientation: landscape) {
+  body {
+    align-items: flex-start;
+    padding: 8px 14px;
+  }
+
+  .container {
+    width: min(900px, 100%);
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-size: clamp(1.15rem, 3.2vw, 1.5rem);
+  }
+
+  .subtitle {
+    margin-top: 6px;
+    font-size: 0.8rem;
+  }
+
+  .card {
+    margin-top: 10px;
+    padding: 12px;
+    max-height: calc(100svh - 84px);
+    overflow-y: auto;
+  }
+
+  .upload-box {
+    padding: 14px 12px;
+  }
+
+  .size-section {
+    margin-top: 10px;
+  }
+
+  .buttons {
+    margin-top: 14px;
+  }
+
+  .camera-panel video {
+    max-height: 130px;
   }
 }
