@@ -12,6 +12,9 @@
   --soft-border: rgba(255, 255, 255, 0.28);
   --field-bg: rgba(255, 255, 255, 0.08);
   --muted-bg: rgba(255, 255, 255, 0.04);
+  --accent-warm-1: #ef4d6d;
+  --accent-warm-2: #f9b233;
+  --accent-warm-3: #ff7e5f;
 }
 
 body {
@@ -38,11 +41,11 @@ body {
 
 body.light-mode {
   --text: #111;
-  --card-bg: rgba(255, 255, 255, 0.78);
-  --card-border: rgba(0, 0, 0, 0.2);
-  --soft-border: rgba(0, 0, 0, 0.18);
-  --field-bg: rgba(255, 255, 255, 0.85);
-  --muted-bg: rgba(245, 245, 245, 0.9);
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: rgba(0, 0, 0, 0.12);
+  --soft-border: rgba(0, 0, 0, 0.12);
+  --field-bg: rgba(255, 255, 255, 0.96);
+  --muted-bg: rgba(248, 248, 248, 0.94);
 }
 
 body.light-mode .bg-video {
@@ -618,6 +621,27 @@ button.convert[disabled] {
 
 button.convert[disabled]::before {
   display: none;
+}
+
+.light-mode .convert {
+  background: linear-gradient(135deg, var(--accent-warm-1), var(--accent-warm-2));
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(249, 178, 51, 0.35);
+}
+
+.light-mode .convert::before {
+  background: linear-gradient(
+    110deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.9) 50%,
+    transparent 65%
+  );
+}
+
+.light-mode .download {
+  background: linear-gradient(120deg, #f3f3f3, #e5e5e5);
+  color: #0f0f0f;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
 }
 
 @keyframes convertFlow {
