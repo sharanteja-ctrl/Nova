@@ -8,8 +8,7 @@ const downloadLink = document.getElementById("downloadLink");
 const dropzone = document.getElementById("dropzone");
 const targetSizeInput = document.getElementById("targetSizeInput");
 const targetUnitSelect = document.getElementById("targetUnitSelect");
-const ultraCompressionInput = document.getElementById("ultraCompressionInput");
-const hardRasterInput = document.getElementById("hardRasterInput");
+const maxCompressionInput = document.getElementById("maxCompressionInput");
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const loadingWrap = document.getElementById("loadingWrap");
 const loadingBar = document.getElementById("loadingBar");
@@ -660,14 +659,12 @@ async function handleConvert() {
     const isOffice = isSingle && isOfficeLike(ext);
     const isPdf = isSingle && ext === "pdf";
     const targetBytes = getTargetBytes();
-    const ultraMode = Boolean(ultraCompressionInput?.checked);
-    const hardRasterMode = Boolean(hardRasterInput?.checked);
-    if (isPdf && hardRasterMode) {
-      setStatus("Converting with Hard Raster Mode... this can take longer for large PDFs.");
-      setLoadingLabel("Hard raster compression in progress...");
-    } else if (isPdf && ultraMode) {
-      setStatus("Converting with Ultra Compression...");
-      setLoadingLabel("Ultra compression in progress...");
+    const maxCompression = Boolean(maxCompressionInput?.checked);
+    const ultraMode = maxCompression;
+    const hardRasterMode = maxCompression;
+    if (isPdf && maxCompression) {
+      setStatus("Max Compression enabled... this can lower quality for a smaller file.");
+      setLoadingLabel("Max compression in progress...");
     } else if (!isSingle && allImages) {
       setLoadingLabel("Merging multiple images...");
     }

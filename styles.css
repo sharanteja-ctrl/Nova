@@ -280,18 +280,71 @@ h1 {
   text-align: left;
 }
 
-.ultra-option {
-  margin-top: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  opacity: 0.9;
+.max-compression {
+  margin-top: 14px;
 }
 
-.ultra-option input {
-  width: 16px;
-  height: 16px;
+.tick-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tick-toggle input {
+  display: none;
+}
+
+.tick-box {
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  position: relative;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6);
+}
+
+.tick-box::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  width: 6px;
+  height: 12px;
+  border: solid #0f0;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform 0.18s ease;
+}
+
+.tick-toggle input:checked + .tick-box {
+  background: linear-gradient(135deg, #00ffb3, #00c2ff);
+  border-color: transparent;
+  box-shadow: 0 0 10px 2px rgba(0, 255, 179, 0.45);
+}
+
+.tick-toggle input:checked + .tick-box::after {
+  transform: rotate(45deg) scale(1);
+}
+
+.tick-label {
+  font-weight: 600;
+}
+
+.tick-hint {
+  margin: 6px 0 0 34px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.light-mode .tick-box {
+  border-color: rgba(0, 0, 0, 0.7);
+}
+
+.light-mode .tick-toggle input:checked + .tick-box {
+  box-shadow: 0 0 10px 2px rgba(0, 194, 255, 0.35);
 }
 
 .size-input {

@@ -61,14 +61,14 @@
               <option selected>KB</option>
             </select>
           </div>
-          <label class="ultra-option">
-            <input id="ultraCompressionInput" type="checkbox" />
-            Ultra Compression (for hard-to-reduce PDFs)
-          </label>
-          <label class="ultra-option">
-            <input id="hardRasterInput" type="checkbox" />
-            Hard Raster Mode (max compression, lower quality)
-          </label>
+          <div class="max-compression">
+            <label class="tick-toggle">
+              <input id="maxCompressionInput" type="checkbox" />
+              <span class="tick-box" aria-hidden="true"></span>
+              <span class="tick-label">Max Compression (Ultra + Hard Raster)</span>
+            </label>
+            <p class="tick-hint">Use when you must hit tiny targets. May reduce quality.</p>
+          </div>
         </div>
 
         <div class="buttons">
