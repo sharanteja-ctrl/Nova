@@ -15,6 +15,7 @@ It supports browser-side conversion for text/images and server-side conversion f
   - Office files (`.doc/.docx/.ppt/.pptx/.xls/.xlsx/.odt/.odp/.ods`)
   - Images (`.png`, `.jpg`, `.jpeg`, `.webp`)
 - Compress uploaded PDF files to a target size (`KB`/`MB`) using server-side compression
+- Ultra Compression mode for difficult PDF size targets
 - Download generated PDF instantly
 
 ## Run

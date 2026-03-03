@@ -8,6 +8,7 @@ const downloadLink = document.getElementById("downloadLink");
 const dropzone = document.getElementById("dropzone");
 const targetSizeInput = document.getElementById("targetSizeInput");
 const targetUnitSelect = document.getElementById("targetUnitSelect");
+const ultraCompressionInput = document.getElementById("ultraCompressionInput");
 const openCameraBtn = document.getElementById("openCameraBtn");
 const closeCameraBtn = document.getElementById("closeCameraBtn");
 const captureBtn = document.getElementById("captureBtn");
@@ -443,7 +444,7 @@ async function convertWithServer(file) {
   return response.blob();
 }
 
-async function compressPdfWithServer(file, targetBytes) {
+async function compressPdfWithServer(file, targetBytes, ultraMode) {
   if (!window.location.protocol.startsWith("http")) {
     throw new Error(
       "For PDF compression, run this project with the Node server (npm start)."
@@ -457,6 +458,7 @@ async function compressPdfWithServer(file, targetBytes) {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("targetBytes", String(targetBytes));
+  formData.append("ultraMode", ultraMode ? "1" : "0");
 
   const response = await fetch("/api/compress-pdf", {
     method: "POST",
@@ -495,6 +497,7 @@ async function handleConvert() {
     const isOffice = isSingle && isOfficeLike(ext);
     const isPdf = isSingle && ext === "pdf";
     const targetBytes = getTargetBytes();
+    const ultraMode = Boolean(ultraCompressionInput?.checked);
 
     let doc = null;
     let serverBlob = null;
@@ -511,7 +514,7 @@ async function handleConvert() {
       doc = result.doc;
       metTarget = result.metTarget;
     } else if (isPdf) {
-      serverBlob = await compressPdfWithServer(primaryFile, targetBytes);
+      serverBlob = await compressPdfWithServer(primaryFile, targetBytes, ultraMode);
     } else if (isOffice) {
       serverBlob = await convertWithServer(primaryFile);
     } else if (isImage) {
@@ -541,7 +544,7 @@ async function handleConvert() {
       );
     } else if (targetBytes && exactSizing.aboveTarget) {
       setStatus(
-        `Done: ${bytesToKb(actualBytes)} KB.${targetText} Could not reach target without damaging quality/content.`
+        `Done: ${bytesToKb(actualBytes)} KB.${targetText} Could not reach target${ultraMode ? " even in ultra mode" : ""}.`
       );
     } else if (isPdf && serverBlob && targetBytes) {
       setStatus(

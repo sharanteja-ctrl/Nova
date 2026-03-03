@@ -222,6 +222,20 @@ h1 {
   text-align: left;
 }
 
+.ultra-option {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.ultra-option input {
+  width: 16px;
+  height: 16px;
+}
+
 .size-input {
   display: flex;
   margin-top: 10px;

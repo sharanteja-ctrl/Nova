@@ -150,6 +150,7 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
   if (!Number.isFinite(targetBytes) || targetBytes <= 0) {
     return res.status(400).json({ error: "Valid targetBytes is required." });
   }
+  const ultraMode = String(req.body.ultraMode || "0") === "1";
 
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "pdf-compress-"));
   const inputPath = path.join(tempRoot, originalName);
@@ -173,6 +174,13 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
       { pdfSettings: "screen", resolution: 96, monoResolution: 144 },
       { pdfSettings: "screen", resolution: 72, monoResolution: 120 },
     ];
+    if (ultraMode) {
+      profiles.push(
+        { pdfSettings: "screen", resolution: 60, monoResolution: 100 },
+        { pdfSettings: "screen", resolution: 48, monoResolution: 72 },
+        { pdfSettings: "screen", resolution: 36, monoResolution: 60 }
+      );
+    }
 
     let bestPath = null;
     let bestSize = Number.POSITIVE_INFINITY;
