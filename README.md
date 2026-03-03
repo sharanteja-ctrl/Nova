@@ -37,6 +37,18 @@ npm start
 
 Then open `http://localhost:8080`.
 
+## Public Deployment (Render)
+
+This project includes:
+- `Dockerfile` (Node + LibreOffice)
+- `render.yaml`
+
+Steps:
+1. Push this folder to a GitHub repository.
+2. In Render, create a new **Blueprint** service from that GitHub repo.
+3. Render reads `render.yaml` and deploys automatically.
+4. Use the Render URL as your public site.
+
 ## Note
 
 `pptx/word/excel` conversion is handled by LibreOffice in the backend API (`/api/convert`).
