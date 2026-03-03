@@ -84,7 +84,6 @@ function startLoading(labelText = "Converting...") {
   loadingLabel.textContent = labelText;
   loadingProgress = 6;
   renderLoadingProgress();
-  loadingWrap.classList.remove("hidden");
 
   if (loadingTimer) {
     clearInterval(loadingTimer);
@@ -112,9 +111,12 @@ function stopLoading(success) {
   loadingProgress = success ? 100 : Math.min(loadingProgress, 96);
   renderLoadingProgress();
 
-  const delay = success ? 420 : 220;
+  const delay = success ? 500 : 260;
   setTimeout(() => {
-    loadingWrap.classList.add("hidden");
+    loadingProgress = 0;
+    renderLoadingProgress();
+    loadingLabel.textContent = "Ready";
+    loadingPercent.textContent = "0%";
   }, delay);
 }
 
