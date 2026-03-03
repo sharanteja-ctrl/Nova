@@ -114,40 +114,47 @@ body.light-mode::after {
 .topbar {
   display: flex;
   justify-content: flex-end;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 100%;
+  pointer-events: none;
 }
 
 .theme-toggle {
   position: relative;
-  width: 90px;
-  height: 46px;
+  width: 72px;
+  height: 34px;
+  margin-left: auto;
   border: none;
   border-radius: 999px;
   padding: 0;
   background: linear-gradient(135deg, #1b1b1b, #2b2b2b);
   box-shadow:
     inset 0 1px 2px rgba(255, 255, 255, 0.2),
-    0 12px 24px rgba(0, 0, 0, 0.35);
+    0 10px 18px rgba(0, 0, 0, 0.32);
   cursor: pointer;
-  transition: background 0.25s ease, box-shadow 0.25s ease;
+  transition: background 0.22s ease, box-shadow 0.22s ease;
+  pointer-events: auto;
 }
 
 .theme-toggle .thumb {
   position: absolute;
-  inset: 3px;
-  width: 40px;
-  height: 40px;
+  inset: 2px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   background: radial-gradient(circle at 30% 30%, #ffe3a1, #ffc107);
   box-shadow:
     inset 0 1px 2px rgba(255, 255, 255, 0.45),
-    0 8px 16px rgba(0, 0, 0, 0.28);
+    0 6px 12px rgba(0, 0, 0, 0.26);
   display: grid;
   place-items: center;
   color: #7a4b00;
-  font-size: 18px;
+  font-size: 16px;
   transform: translateX(0);
-  transition: transform 0.25s ease, background 0.25s ease, color 0.25s ease,
-    box-shadow 0.25s ease;
+  transition: transform 0.22s ease, background 0.22s ease, color 0.22s ease,
+    box-shadow 0.22s ease;
 }
 
 .theme-toggle .sun-icon,
@@ -163,13 +170,14 @@ body.light-mode::after {
   background: linear-gradient(135deg, #fff7c2, #ffd54f);
   box-shadow:
     inset 0 1px 3px rgba(255, 255, 255, 0.6),
-    0 12px 24px rgba(255, 214, 79, 0.35);
+    0 10px 20px rgba(255, 214, 79, 0.35);
 }
 
 .theme-toggle.sun .thumb {
   background: radial-gradient(circle at 30% 30%, #fff7d6, #ffcd38);
   color: #7a4b00;
-  transform: translateX(calc(100% - 2px));
+  transform: translateX(36px);
+  animation: thumbPop 0.28s ease;
 }
 
 .theme-toggle.sun .sun-icon {
@@ -191,6 +199,24 @@ body.light-mode::after {
   background: radial-gradient(circle at 65% 30%, #2f7bff, #0d3b82);
   color: #e9f3ff;
   transform: translateX(0);
+  animation: thumbPop 0.28s ease;
+}
+
+.theme-toggle .sun-icon,
+.theme-toggle .moon-icon {
+  line-height: 1;
+}
+
+@keyframes thumbPop {
+  0% {
+    transform: scale(0.96) translateX(0);
+  }
+  55% {
+    transform: scale(1.06) translateX(0);
+  }
+  100% {
+    transform: scale(1) translateX(0);
+  }
 }
 
 .theme-toggle.moon .sun-icon {
