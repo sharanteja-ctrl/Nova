@@ -71,7 +71,12 @@ async function convertToPdfWithLibreOffice(inputPath, outDir) {
   );
 }
 
-async function compressPdfWithGhostscript(inputPath, outputPath, profile) {
+async function compressPdfWithGhostscript(
+  inputPath,
+  outputPath,
+  profile,
+  timeoutMs = 150000
+) {
   const args = [
     "-sDEVICE=pdfwrite",
     "-dCompatibilityLevel=1.4",
@@ -91,7 +96,7 @@ async function compressPdfWithGhostscript(inputPath, outputPath, profile) {
   ];
 
   try {
-    await runCommand("gs", args, 75000);
+    await runCommand("gs", args, timeoutMs);
   } catch (error) {
     if (error.code === "ENOENT") {
       throw new Error(
@@ -102,7 +107,13 @@ async function compressPdfWithGhostscript(inputPath, outputPath, profile) {
   }
 }
 
-async function rasterizePdfToJpegs(inputPath, outputPattern, dpi, quality) {
+async function rasterizePdfToJpegs(
+  inputPath,
+  outputPattern,
+  dpi,
+  quality,
+  timeoutMs = 120000
+) {
   const args = [
     "-sDEVICE=jpeg",
     "-dNOPAUSE",
@@ -116,10 +127,10 @@ async function rasterizePdfToJpegs(inputPath, outputPattern, dpi, quality) {
     `-sOutputFile=${outputPattern}`,
     inputPath,
   ];
-  await runCommand("gs", args, 60000);
+  await runCommand("gs", args, timeoutMs);
 }
 
-async function buildPdfFromImages(imagePaths, outputPath) {
+async function buildPdfFromImages(imagePaths, outputPath, timeoutMs = 90000) {
   const args = [
     "-sDEVICE=pdfwrite",
     "-dNOPAUSE",
@@ -129,7 +140,7 @@ async function buildPdfFromImages(imagePaths, outputPath) {
     `-sOutputFile=${outputPath}`,
     ...imagePaths,
   ];
-  await runCommand("gs", args, 45000);
+  await runCommand("gs", args, timeoutMs);
 }
 
 function getFastCompressionProfiles(compressionRatio, ultraMode) {
@@ -251,7 +262,11 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
     }
 
     const compressionRatio = targetBytes / Math.max(1, originalSize);
-    const profiles = hardRasterMode
+    const aggressiveTarget = compressionRatio <= 0.2;
+    const shouldPreferRasterFirst = hardRasterMode && aggressiveTarget;
+    const profiles = shouldPreferRasterFirst
+      ? []
+      : hardRasterMode
       ? [getFastCompressionProfiles(compressionRatio, ultraMode)[0]]
       : getFastCompressionProfiles(compressionRatio, ultraMode);
 
@@ -288,7 +303,8 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
           inputPath,
           pattern,
           rasterProfiles[i].dpi,
-          rasterProfiles[i].quality
+          rasterProfiles[i].quality,
+          shouldPreferRasterFirst ? 160000 : 120000
         );
 
         const images = (await fs.readdir(rasterDir))
@@ -300,7 +316,7 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
         }
 
         const outPath = path.join(tempRoot, `raster-compressed-${i}.pdf`);
-        await buildPdfFromImages(images, outPath);
+        await buildPdfFromImages(images, outPath, shouldPreferRasterFirst ? 120000 : 90000);
         const stat = await fs.stat(outPath);
         const currentSize = stat.size;
 
