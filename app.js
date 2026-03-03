@@ -501,6 +501,11 @@ async function handleConvert() {
     const targetBytes = getTargetBytes();
     const ultraMode = Boolean(ultraCompressionInput?.checked);
     const hardRasterMode = Boolean(hardRasterInput?.checked);
+    if (isPdf && hardRasterMode) {
+      setStatus("Converting with Hard Raster Mode... this can take longer for large PDFs.");
+    } else if (isPdf && ultraMode) {
+      setStatus("Converting with Ultra Compression...");
+    }
 
     let doc = null;
     let serverBlob = null;
