@@ -5,6 +5,15 @@
   font-family: "Poppins", sans-serif;
 }
 
+:root {
+  --text: #fff;
+  --card-bg: rgba(0, 0, 0, 0.62);
+  --card-border: rgba(255, 255, 255, 0.32);
+  --soft-border: rgba(255, 255, 255, 0.28);
+  --field-bg: rgba(255, 255, 255, 0.08);
+  --muted-bg: rgba(255, 255, 255, 0.04);
+}
+
 body {
   min-height: 100svh;
   display: flex;
@@ -14,7 +23,7 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   background: #000;
-  color: #fff;
+  color: var(--text);
 }
 
 .bg-video {
@@ -25,6 +34,19 @@ body {
   object-fit: cover;
   z-index: -3;
   filter: grayscale(100%) contrast(1.05) brightness(0.45);
+}
+
+body.light-mode {
+  --text: #111;
+  --card-bg: rgba(255, 255, 255, 0.78);
+  --card-border: rgba(0, 0, 0, 0.2);
+  --soft-border: rgba(0, 0, 0, 0.18);
+  --field-bg: rgba(255, 255, 255, 0.85);
+  --muted-bg: rgba(255, 255, 255, 0.65);
+}
+
+body.light-mode .bg-video {
+  filter: grayscale(100%) contrast(0.85) brightness(0.95);
 }
 
 body::before,
@@ -75,11 +97,31 @@ body::after {
 .container {
   width: min(620px, 100%);
   text-align: center;
-  color: #fff;
+  color: var(--text);
   position: relative;
   z-index: 1;
   margin: 18px 0;
   max-height: calc(100svh - 24px);
+}
+
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.theme-toggle {
+  flex: 0 0 auto;
+  min-height: auto;
+  border: 1px solid var(--soft-border);
+  border-radius: 999px;
+  padding: 8px 14px;
+  background: var(--muted-bg);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.hero {
+  animation: heroRise 0.9s ease both;
 }
 
 h1 {
@@ -96,11 +138,12 @@ h1 {
 }
 
 .card {
+  position: relative;
   margin-top: 30px;
   padding: 28px;
   border-radius: 22px;
-  background: rgba(0, 0, 0, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.32);
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.12) inset,
     0 26px 60px rgba(0, 0, 0, 0.6);
@@ -108,6 +151,18 @@ h1 {
   transition: transform 0.35s ease, box-shadow 0.35s ease;
   max-height: min(76svh, 880px);
   overflow-y: auto;
+}
+
+.success-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+}
+
+.card.success-pop .success-burst {
+  animation: successPulse 0.9s ease;
 }
 
 .card.file-selected {
@@ -278,8 +333,8 @@ h1 {
   margin-top: 14px;
   padding: 10px 12px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--soft-border);
+  background: var(--muted-bg);
 }
 
 .loading-meta {
@@ -297,8 +352,8 @@ h1 {
   height: 10px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--soft-border);
 }
 
 .loading-bar {
@@ -333,11 +388,11 @@ button,
   flex: 1;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--soft-border);
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
-  color: #fff;
+  color: var(--text);
   text-align: center;
   text-decoration: none;
   background: #111;
@@ -369,6 +424,11 @@ button,
 .download {
   background: linear-gradient(120deg, #2b2b2b, #000);
   color: #fff;
+}
+
+.download.pending {
+  pointer-events: none;
+  opacity: 0.6;
 }
 
 button:hover,
@@ -427,7 +487,7 @@ button.convert[disabled]::before {
 .status {
   margin-top: 14px;
   font-size: 0.92rem;
-  color: #fff;
+  color: var(--text);
   opacity: 0.95;
   text-align: left;
   min-height: 1.4em;
@@ -435,6 +495,33 @@ button.convert[disabled]::before {
 
 .hidden {
   display: none;
+}
+
+
+@keyframes heroRise {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes successPulse {
+  0% {
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.8) inset,
+      0 0 40px rgba(255, 255, 255, 0.55);
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 @media (max-width: 860px) {

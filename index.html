@@ -23,10 +23,17 @@
     </video>
 
     <div class="container">
-      <h1>Nova Converter</h1>
-      <p class="subtitle">Fast • Secure • High Quality Compression</p>
+      <div class="topbar">
+        <button id="themeToggleBtn" class="theme-toggle" type="button">Light Mode</button>
+      </div>
+
+      <section class="hero">
+        <h1>Nova Converter</h1>
+        <p class="subtitle">Fast • Secure • High Quality Compression</p>
+      </section>
 
       <div class="card">
+        <div class="success-burst" id="successBurst" aria-hidden="true"></div>
         <label class="upload-box" id="dropzone" for="fileInput">
           <input id="fileInput" type="file" multiple />
           <p id="fileInfo">Drop files here or click to upload (you can select many photos)</p>
@@ -81,6 +88,7 @@
 
         <p id="status" class="status" aria-live="polite">Choose a document to start.</p>
       </div>
+
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>

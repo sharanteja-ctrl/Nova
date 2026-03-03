@@ -10,10 +10,12 @@ const targetSizeInput = document.getElementById("targetSizeInput");
 const targetUnitSelect = document.getElementById("targetUnitSelect");
 const ultraCompressionInput = document.getElementById("ultraCompressionInput");
 const hardRasterInput = document.getElementById("hardRasterInput");
+const themeToggleBtn = document.getElementById("themeToggleBtn");
 const loadingWrap = document.getElementById("loadingWrap");
 const loadingBar = document.getElementById("loadingBar");
 const loadingLabel = document.getElementById("loadingLabel");
 const loadingPercent = document.getElementById("loadingPercent");
+const successBurst = document.getElementById("successBurst");
 const openCameraBtn = document.getElementById("openCameraBtn");
 const closeCameraBtn = document.getElementById("closeCameraBtn");
 const captureBtn = document.getElementById("captureBtn");
@@ -26,6 +28,7 @@ let activeCameraStream = null;
 let cameraCapturedFiles = [];
 let loadingTimer = null;
 let loadingProgress = 0;
+let downloadTimer = null;
 
 const textExtensions = new Set([
   "txt",
@@ -72,12 +75,41 @@ function getExt(filename) {
 function resetDownloadLink() {
   downloadLink.classList.add("hidden");
   downloadLink.removeAttribute("href");
+  downloadLink.classList.remove("pending");
+  downloadLink.textContent = "Download PDF";
+  if (downloadTimer) {
+    clearInterval(downloadTimer);
+    downloadTimer = null;
+  }
+}
+
+function startDownloadCountdown(linkEl, finalText) {
+  let count = 3;
+  linkEl.classList.add("pending");
+  linkEl.textContent = `Download in ${count}s`;
+  const timer = setInterval(() => {
+    count -= 1;
+    if (count <= 0) {
+      clearInterval(timer);
+      linkEl.classList.remove("pending");
+      linkEl.textContent = finalText;
+      return;
+    }
+    linkEl.textContent = `Download in ${count}s`;
+  }, 1000);
 }
 
 function renderLoadingProgress() {
   const value = Math.max(0, Math.min(100, Math.round(loadingProgress)));
   loadingBar.style.width = `${value}%`;
   loadingPercent.textContent = `${value}%`;
+}
+
+function triggerSuccessAnimation() {
+  if (!card) return;
+  card.classList.remove("success-pop");
+  void card.offsetWidth;
+  card.classList.add("success-pop");
 }
 
 function startLoading(labelText = "Converting...") {
@@ -281,6 +313,11 @@ function savePdf(blob, inputName) {
   downloadLink.href = url;
   downloadLink.download = outputName;
   downloadLink.classList.remove("hidden");
+  if (downloadTimer) {
+    clearInterval(downloadTimer);
+    downloadTimer = null;
+  }
+  startDownloadCountdown(downloadLink, "Download PDF");
   return blob.size;
 }
 
@@ -639,6 +676,7 @@ async function handleConvert() {
       );
     }
     success = true;
+    triggerSuccessAnimation();
   } catch (error) {
     setStatus(`Failed: ${error.message}`);
   } finally {
@@ -698,3 +736,9 @@ captureBtn.addEventListener("click", async () => {
 });
 
 window.addEventListener("beforeunload", stopCamera);
+
+themeToggleBtn.addEventListener("click", () => {
+  document.body.classList.toggle("light-mode");
+  const isLight = document.body.classList.contains("light-mode");
+  themeToggleBtn.textContent = isLight ? "Dark Mode" : "Light Mode";
+});
