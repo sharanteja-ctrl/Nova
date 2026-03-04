@@ -2,183 +2,234 @@ import * as THREE from "https://unpkg.com/three@0.162.0/build/three.module.js";
 import { OrbitControls } from "https://unpkg.com/three@0.162.0/examples/jsm/controls/OrbitControls.js";
 
 const canvas = document.getElementById("bgCanvas");
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+if (!canvas) {
+  throw new Error("Missing #bgCanvas element");
+}
+
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  alpha: false,
+  powerPreference: "high-performance",
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x03030a, 1);
+renderer.setClearColor(0x000000, 1);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x03030a);
+scene.background = new THREE.Color(0x000000);
 
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 120);
-camera.position.set(0, 0, 9);
+const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 120);
+camera.position.set(0, 2.6, 12.8);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableZoom = false;
 controls.enablePan = false;
 controls.enableRotate = false;
 controls.enableDamping = true;
-controls.dampingFactor = 0.06;
+controls.dampingFactor = 0.055;
 
-const radius = 3.2;
-const pointCount = window.innerWidth > 1100 ? 1200 : window.innerWidth > 700 ? 880 : 520;
+const waveGroup = new THREE.Group();
+scene.add(waveGroup);
 
-// Generate evenly distributed points on a sphere (Fibonacci sphere)
-function generatePoints(count, r) {
-  const positions = [];
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < count; i += 1) {
-    const y = 1 - (i / (count - 1)) * 2;
-    const radiusAtY = Math.sqrt(1 - y * y);
-    const theta = golden * i;
-    const x = Math.cos(theta) * radiusAtY;
-    const z = Math.sin(theta) * radiusAtY;
-    positions.push(x * r, y * r, z * r);
+let waveData = null;
+let targetRotX = 0;
+let targetRotY = 0;
+let smoothRotX = 0;
+let smoothRotY = 0;
+
+function buildWave() {
+  if (waveData) {
+    waveGroup.remove(waveData.lines);
+    waveGroup.remove(waveData.points);
+    waveData.points.geometry.dispose();
+    waveData.points.material.dispose();
+    waveData.lines.geometry.dispose();
+    waveData.lines.material.dispose();
   }
-  return new Float32Array(positions);
-}
 
-const pointPositions = generatePoints(pointCount, radius);
-const pointsGeo = new THREE.BufferGeometry();
-pointsGeo.setAttribute("position", new THREE.BufferAttribute(pointPositions, 3));
+  const isMobile = window.innerWidth < 760;
+  const segX = isMobile ? 102 : 154;
+  const segZ = isMobile ? 60 : 90;
+  const width = isMobile ? 15.5 : 20.5;
+  const depth = isMobile ? 9.2 : 12.2;
 
-const neonBlue = new THREE.Color(0x4de2ff);
-const neonCyan = new THREE.Color(0x7ae0ff);
-const neonPurple = new THREE.Color(0x7c5bff);
+  const total = segX * segZ;
+  const positions = new Float32Array(total * 3);
+  const seeds = new Float32Array(total * 2);
+  const base = new Float32Array(total * 2);
 
-const pointsMat = new THREE.PointsMaterial({
-  color: neonCyan,
-  size: 0.032,
-  sizeAttenuation: true,
-  transparent: true,
-  opacity: 0.95,
-  blending: THREE.AdditiveBlending,
-});
-const points = new THREE.Points(pointsGeo, pointsMat);
+  const xStep = width / (segX - 1);
+  const zStep = depth / (segZ - 1);
 
-const haloMat = new THREE.PointsMaterial({
-  color: neonBlue,
-  size: 0.08,
-  sizeAttenuation: true,
-  transparent: true,
-  opacity: 0.18,
-  blending: THREE.AdditiveBlending,
-});
-const halo = new THREE.Points(pointsGeo.clone(), haloMat);
+  let ptr = 0;
+  for (let zi = 0; zi < segZ; zi += 1) {
+    for (let xi = 0; xi < segX; xi += 1) {
+      const x = -width / 2 + xi * xStep;
+      const z = -depth / 2 + zi * zStep;
 
-// Build line segments between nearby points
-function buildLines(positions, threshold = 0.58, maxPerPoint = 4) {
-  const verts = [];
-  const len = positions.length / 3;
-  for (let i = 0; i < len; i += 1) {
-    const ix = positions[i * 3];
-    const iy = positions[i * 3 + 1];
-    const iz = positions[i * 3 + 2];
-    let connections = 0;
-    for (let j = i + 1; j < len; j += 1) {
-      if (connections >= maxPerPoint) break;
-      const jx = positions[j * 3];
-      const jy = positions[j * 3 + 1];
-      const jz = positions[j * 3 + 2];
-      const dx = ix - jx;
-      const dy = iy - jy;
-      const dz = iz - jz;
-      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (dist < threshold) {
-        verts.push(ix, iy, iz, jx, jy, jz);
-        connections += 1;
-      }
+      positions[ptr * 3] = x;
+      positions[ptr * 3 + 1] = 0;
+      positions[ptr * 3 + 2] = z;
+
+      base[ptr * 2] = x;
+      base[ptr * 2 + 1] = z;
+      seeds[ptr * 2] = Math.random() * Math.PI * 2;
+      seeds[ptr * 2 + 1] = Math.random() * 0.9 + 0.65;
+      ptr += 1;
     }
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(verts), 3));
-  return geo;
-}
 
-const lineGeo = buildLines(pointPositions, 0.65, 4);
-const lineMat = new THREE.LineBasicMaterial({
-  color: neonPurple,
-  transparent: true,
-  opacity: 0.22,
-  blending: THREE.AdditiveBlending,
-});
-const lines = new THREE.LineSegments(lineGeo, lineMat);
+  const pointsGeo = new THREE.BufferGeometry();
+  pointsGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
-// Starfield / floating particles
-function buildStars(count = 900, spread = 26) {
-  const positions = [];
-  for (let i = 0; i < count; i += 1) {
-    positions.push(
-      (Math.random() - 0.5) * spread,
-      (Math.random() - 0.5) * spread,
-      (Math.random() - 0.5) * spread
-    );
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
-  const mat = new THREE.PointsMaterial({
-    color: 0x5acbff,
-    size: 0.02,
+  const pointsMat = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: isMobile ? 0.035 : 0.029,
     sizeAttenuation: true,
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.93,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
-  return new THREE.Points(geo, mat);
+
+  const points = new THREE.Points(pointsGeo, pointsMat);
+
+  const lineVerts = [];
+  const pushLine = (a, b) => {
+    const ax = positions[a * 3];
+    const ay = positions[a * 3 + 1];
+    const az = positions[a * 3 + 2];
+    const bx = positions[b * 3];
+    const by = positions[b * 3 + 1];
+    const bz = positions[b * 3 + 2];
+    lineVerts.push(ax, ay, az, bx, by, bz);
+  };
+
+  for (let zi = 0; zi < segZ; zi += 1) {
+    for (let xi = 0; xi < segX; xi += 1) {
+      const index = zi * segX + xi;
+      if (xi < segX - 1) {
+        pushLine(index, index + 1);
+      }
+      if (zi < segZ - 1 && xi % 2 === 0) {
+        pushLine(index, index + segX);
+      }
+    }
+  }
+
+  const lineGeo = new THREE.BufferGeometry();
+  lineGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(lineVerts), 3));
+
+  const lineMat = new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.09,
+    depthWrite: false,
+  });
+
+  const lines = new THREE.LineSegments(lineGeo, lineMat);
+
+  waveGroup.add(lines);
+  waveGroup.add(points);
+
+  waveGroup.position.set(0, -1.78, -1.8);
+  waveGroup.rotation.x = -0.66;
+
+  waveData = {
+    positions,
+    base,
+    seeds,
+    points,
+    lines,
+  };
 }
 
-const stars = buildStars();
-
-const group = new THREE.Group();
-group.add(points);
-group.add(halo);
-group.add(lines);
-scene.add(stars);
-scene.add(group);
-
-let desiredX = 0;
-let desiredY = 0;
-let smoothX = 0;
-let smoothY = 0;
-let autoY = 0;
-
-function handlePointer(x, y) {
-  const nx = (x / window.innerWidth) - 0.5;
-  const ny = (y / window.innerHeight) - 0.5;
-  desiredY = nx * 1.3; // yaw
-  desiredX = ny * 0.9; // pitch
+function sampleHeight(x, z, t, seedPhase, seedSpeed) {
+  const p = seedPhase || 0;
+  const s = seedSpeed || 1;
+  const waveA = Math.sin(x * 0.96 + t * s + p) * 0.21;
+  const waveB = Math.cos(z * 1.23 + t * s * 0.82 + p * 0.62) * 0.18;
+  const waveC = Math.sin((x + z) * 0.55 + t * 0.9 + p * 0.9) * 0.14;
+  return waveA + waveB + waveC;
 }
 
-window.addEventListener("mousemove", (e) => handlePointer(e.clientX, e.clientY), { passive: true });
-window.addEventListener("touchmove", (e) => {
-  if (!e.touches.length) return;
-  const t = e.touches[0];
-  handlePointer(t.clientX, t.clientY);
-}, { passive: true });
+function updateWave(t) {
+  if (!waveData) return;
+
+  const { positions, base, seeds, points, lines } = waveData;
+  const total = positions.length / 3;
+
+  for (let i = 0; i < total; i += 1) {
+    const x = base[i * 2];
+    const z = base[i * 2 + 1];
+    const phase = seeds[i * 2];
+    const speed = seeds[i * 2 + 1];
+    positions[i * 3 + 1] = sampleHeight(x, z, t, phase, speed);
+  }
+  points.geometry.attributes.position.needsUpdate = true;
+
+  const linePos = lines.geometry.attributes.position.array;
+  for (let i = 0; i < linePos.length; i += 3) {
+    const x = linePos[i];
+    const z = linePos[i + 2];
+    linePos[i + 1] = sampleHeight(x, z, t, 0, 0.95);
+  }
+  lines.geometry.attributes.position.needsUpdate = true;
+}
+
+function setPointerTarget(clientX, clientY) {
+  const nx = clientX / window.innerWidth - 0.5;
+  const ny = clientY / window.innerHeight - 0.5;
+  targetRotY = nx * 0.42;
+  targetRotX = ny * 0.28;
+}
+
+window.addEventListener(
+  "mousemove",
+  (event) => {
+    setPointerTarget(event.clientX, event.clientY);
+  },
+  { passive: true }
+);
+
+window.addEventListener(
+  "touchmove",
+  (event) => {
+    if (!event.touches.length) return;
+    const touch = event.touches[0];
+    setPointerTarget(touch.clientX, touch.clientY);
+  },
+  { passive: true }
+);
 
 function onResize() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  camera.aspect = w / h;
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(w, h);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  buildWave();
 }
+
 window.addEventListener("resize", onResize);
+
+const clock = new THREE.Clock();
 
 function animate() {
   requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
 
-  smoothX += (desiredX - smoothX) * 0.06;
-  smoothY += (desiredY - smoothY) * 0.06;
-  autoY += 0.0032; // idle spin
+  updateWave(t);
 
-  group.rotation.x = smoothX;
-  group.rotation.y = autoY + smoothY;
-  stars.rotation.y += 0.0008;
+  smoothRotX += (targetRotX - smoothRotX) * 0.045;
+  smoothRotY += (targetRotY - smoothRotY) * 0.045;
+
+  waveGroup.rotation.y = smoothRotY + Math.sin(t * 0.16) * 0.05;
+  waveGroup.rotation.x = -0.66 + smoothRotX + Math.cos(t * 0.11) * 0.012;
 
   controls.update();
   renderer.render(scene, camera);
 }
 
+buildWave();
 animate();

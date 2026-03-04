@@ -25,9 +25,10 @@ body {
   padding: 24px;
   overflow-x: hidden;
   overflow-y: auto;
-  background: radial-gradient(120% 120% at 20% 20%, rgba(66, 123, 255, 0.14), transparent 40%),
-    radial-gradient(120% 120% at 80% 10%, rgba(123, 69, 255, 0.16), transparent 42%),
-    #03030a;
+  background:
+    radial-gradient(140% 120% at 12% 18%, rgba(255, 255, 255, 0.07), transparent 36%),
+    radial-gradient(130% 120% at 88% 10%, rgba(255, 255, 255, 0.05), transparent 42%),
+    #000;
   color: var(--text);
 }
 
@@ -41,57 +42,6 @@ body {
   pointer-events: none;
 }
 
-.hero-ornaments {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.orb {
-  position: absolute;
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  filter: blur(30px);
-  opacity: 0.35;
-  mix-blend-mode: screen;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.4), transparent 60%);
-  animation: orbFloat 18s ease-in-out infinite alternate;
-}
-
-.orb-a {
-  top: 6%;
-  left: -6%;
-  background: radial-gradient(circle at 30% 30%, #f55353, transparent 60%);
-  animation-duration: 22s;
-}
-
-.orb-b {
-  top: 22%;
-  right: -10%;
-  background: radial-gradient(circle at 60% 40%, #00d2ff, transparent 60%);
-  animation-duration: 26s;
-}
-
-.orb-c {
-  bottom: -8%;
-  left: 22%;
-  background: radial-gradient(circle at 60% 50%, #f9b233, transparent 60%);
-  animation-duration: 24s;
-}
-
-@keyframes orbFloat {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.3;
-  }
-  100% {
-    transform: translate3d(12px, -10px, 0) scale(1.08);
-    opacity: 0.45;
-  }
-}
-
 body.light-mode {
   --text: #fff;
   --card-bg: rgba(0, 0, 0, 0.62);
@@ -99,10 +49,6 @@ body.light-mode {
   --soft-border: rgba(255, 255, 255, 0.28);
   --field-bg: rgba(255, 255, 255, 0.08);
   --muted-bg: rgba(255, 255, 255, 0.04);
-}
-
-body.light-mode .bg-video {
-  filter: grayscale(100%) contrast(1.02) brightness(0.38);
 }
 
 body::before,
@@ -134,39 +80,6 @@ body::after {
   to {
     opacity: 0.82;
     transform: scale(1.04);
-  }
-}
-
-@keyframes smokeDriftA {
-  0% {
-    transform: translate3d(-2vw, -1.5vh, 0) scale(1) rotate(0deg);
-    opacity: 0.2;
-  }
-  100% {
-    transform: translate3d(10vw, 5vh, 0) scale(1.14) rotate(8deg);
-    opacity: 0.3;
-  }
-}
-
-@keyframes smokeDriftB {
-  0% {
-    transform: translate3d(2vw, -2vh, 0) scale(1) rotate(0deg);
-    opacity: 0.18;
-  }
-  100% {
-    transform: translate3d(-11vw, 7vh, 0) scale(1.12) rotate(-10deg);
-    opacity: 0.28;
-  }
-}
-
-@keyframes smokeDriftC {
-  0% {
-    transform: translate3d(-3vw, 2vh, 0) scale(1) rotate(0deg);
-    opacity: 0.2;
-  }
-  100% {
-    transform: translate3d(8vw, -6vh, 0) scale(1.16) rotate(6deg);
-    opacity: 0.29;
   }
 }
 
