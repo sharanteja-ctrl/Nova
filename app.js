@@ -5,6 +5,11 @@ const convertBtn = document.getElementById("convertBtn");
 const statusEl = document.getElementById("status");
 const fileInfo = document.getElementById("fileInfo");
 const downloadLink = document.getElementById("downloadLink");
+const previewControls = document.getElementById("previewControls");
+const previewBtn = document.getElementById("previewBtn");
+const previewWrap = document.getElementById("previewWrap");
+const previewFrame = document.getElementById("previewFrame");
+const previewCloseBtn = document.getElementById("previewCloseBtn");
 const dropzone = document.getElementById("dropzone");
 const targetSizeInput = document.getElementById("targetSizeInput");
 const targetUnitSelect = document.getElementById("targetUnitSelect");
@@ -27,6 +32,7 @@ let cameraCapturedFiles = [];
 let loadingTimer = null;
 let loadingProgress = 0;
 let downloadTimer = null;
+let outputUrl = null;
 
 const textExtensions = new Set([
   "txt",
@@ -71,10 +77,17 @@ function getExt(filename) {
 }
 
 function resetDownloadLink() {
+  if (outputUrl) {
+    URL.revokeObjectURL(outputUrl);
+    outputUrl = null;
+  }
   downloadLink.classList.add("hidden");
   downloadLink.removeAttribute("href");
   downloadLink.classList.remove("pending");
   downloadLink.textContent = "Download PDF";
+  previewControls.classList.add("hidden");
+  previewWrap.classList.add("hidden");
+  previewFrame.removeAttribute("src");
   if (downloadTimer) {
     clearInterval(downloadTimer);
     downloadTimer = null;
@@ -311,7 +324,11 @@ function getOutputPdfName(inputName) {
 }
 
 function saveOutputBlob(blob, downloadName, finalLabel) {
+  if (outputUrl) {
+    URL.revokeObjectURL(outputUrl);
+  }
   const url = URL.createObjectURL(blob);
+  outputUrl = url;
   downloadLink.href = url;
   downloadLink.download = downloadName;
   downloadLink.classList.remove("hidden");
@@ -320,6 +337,18 @@ function saveOutputBlob(blob, downloadName, finalLabel) {
     downloadTimer = null;
   }
   startDownloadCountdown(downloadLink, finalLabel);
+
+  const isPdfOutput =
+    (blob.type && blob.type.includes("pdf")) || /\.pdf$/i.test(downloadName);
+  if (isPdfOutput) {
+    previewControls.classList.remove("hidden");
+    previewWrap.classList.add("hidden");
+    previewFrame.removeAttribute("src");
+  } else {
+    previewControls.classList.add("hidden");
+    previewWrap.classList.add("hidden");
+    previewFrame.removeAttribute("src");
+  }
   return blob.size;
 }
 
@@ -773,6 +802,20 @@ fileInput.addEventListener("change", (event) => {
 });
 
 convertBtn.addEventListener("click", handleConvert);
+
+previewBtn?.addEventListener("click", () => {
+  if (!outputUrl) {
+    return;
+  }
+  previewFrame.src = `${outputUrl}#zoom=page-width`;
+  previewWrap.classList.remove("hidden");
+  setStatus("Preview ready. Check quality before downloading.");
+});
+
+previewCloseBtn?.addEventListener("click", () => {
+  previewWrap.classList.add("hidden");
+  previewFrame.removeAttribute("src");
+});
 
 ["dragenter", "dragover"].forEach((eventName) => {
   dropzone.addEventListener(eventName, (event) => {

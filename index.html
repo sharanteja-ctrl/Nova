@@ -15,7 +15,7 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260304-05" />
+    <link rel="stylesheet" href="styles.css?v=20260304-06" />
   </head>
   <body>
     <video class="bg-video" autoplay muted loop playsinline>
@@ -80,6 +80,18 @@
           <a id="downloadLink" class="download hidden" download>Download PDF</a>
         </div>
 
+        <div id="previewControls" class="preview-controls hidden">
+          <button id="previewBtn" class="download preview-toggle" type="button">Preview PDF</button>
+        </div>
+
+        <div id="previewWrap" class="preview-wrap hidden">
+          <div class="preview-header">
+            <span>PDF Preview</span>
+            <button id="previewCloseBtn" class="preview-close" type="button">Close</button>
+          </div>
+          <iframe id="previewFrame" title="PDF preview"></iframe>
+        </div>
+
         <div id="loadingWrap" class="loading-wrap" aria-live="polite">
           <div class="loading-meta">
             <span id="loadingLabel">Preparing conversion...</span>
@@ -98,7 +110,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="app.js?v=20260304-05"></script>
+    <script src="app.js?v=20260304-06"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
