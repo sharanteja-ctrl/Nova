@@ -35,15 +35,31 @@ body {
   z-index: -6;
   overflow: hidden;
   background:
-    radial-gradient(140% 120% at 52% 0%, rgba(210, 234, 242, 0.54), transparent 36%),
-    radial-gradient(130% 120% at 12% 20%, rgba(12, 96, 112, 0.62), transparent 52%),
-    radial-gradient(130% 120% at 88% 26%, rgba(16, 75, 58, 0.62), transparent 48%),
+    radial-gradient(140% 120% at 52% 0%, rgba(224, 241, 248, 0.72), transparent 36%),
+    radial-gradient(130% 120% at 12% 20%, rgba(11, 100, 118, 0.72), transparent 52%),
+    radial-gradient(130% 120% at 88% 26%, rgba(18, 96, 72, 0.72), transparent 48%),
     linear-gradient(180deg, #0a2128 0%, #0e4254 42%, #0e3f50 70%, #07313c 100%);
+  animation: sceneDrift 26s ease-in-out infinite alternate;
+}
+
+.rain-scene::after {
+  content: "";
+  position: absolute;
+  inset: -5%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.16), transparent 36%),
+    radial-gradient(circle at 70% 14%, rgba(209, 241, 255, 0.12), transparent 44%),
+    radial-gradient(circle at 52% 76%, rgba(120, 210, 231, 0.15), transparent 46%);
+  mix-blend-mode: screen;
+  filter: blur(28px);
+  opacity: 0.74;
+  animation: glowSweep 18s ease-in-out infinite alternate;
 }
 
 .city-blur {
   position: absolute;
-  inset: -6%;
+  inset: -9%;
   background:
     radial-gradient(38% 70% at 50% 18%, rgba(240, 249, 253, 0.72), transparent 62%),
     linear-gradient(
@@ -75,21 +91,21 @@ body {
       transparent 86%
     ),
     linear-gradient(180deg, rgba(22, 74, 90, 0.22), rgba(8, 39, 48, 0.78));
-  filter: blur(10px) saturate(1.08);
-  transform: scale(1.06);
-  animation: cityFloat 18s ease-in-out infinite alternate;
+  filter: blur(12px) saturate(1.12);
+  transform: scale(1.1);
+  animation: cityFloat 24s ease-in-out infinite alternate;
 }
 
 .mist-overlay {
   position: absolute;
-  inset: -14%;
+  inset: -18%;
   background:
     radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.23), transparent 42%),
     radial-gradient(circle at 16% 60%, rgba(62, 165, 177, 0.18), transparent 47%),
     radial-gradient(circle at 84% 62%, rgba(19, 122, 92, 0.2), transparent 50%);
-  filter: blur(32px);
-  opacity: 0.72;
-  animation: mistPulse 14s ease-in-out infinite alternate;
+  filter: blur(38px);
+  opacity: 0.8;
+  animation: mistPulse 12s ease-in-out infinite alternate;
 }
 
 .rain-canvas {
@@ -98,12 +114,12 @@ body {
   width: 100%;
   height: 100%;
   pointer-events: none;
-  opacity: 0.85;
+  opacity: 0.92;
 }
 
 .glass-noise {
   position: absolute;
-  inset: -8%;
+  inset: -12%;
   pointer-events: none;
   background-image:
     radial-gradient(circle at 14% 22%, rgba(255, 255, 255, 0.13) 0 1px, transparent 2px),
@@ -118,8 +134,28 @@ body {
     );
   background-size: 280px 280px, 260px 260px, 300px 300px, auto;
   mix-blend-mode: soft-light;
-  opacity: 0.32;
-  animation: grainDrift 8s steps(12, end) infinite;
+  opacity: 0.4;
+  animation: grainDrift 6.5s steps(12, end) infinite;
+}
+
+@keyframes sceneDrift {
+  from {
+    transform: scale(1) translate3d(-0.6%, -0.4%, 0);
+  }
+  to {
+    transform: scale(1.06) translate3d(0.9%, 0.7%, 0);
+  }
+}
+
+@keyframes glowSweep {
+  from {
+    transform: translate3d(-1.4%, -1.2%, 0);
+    opacity: 0.58;
+  }
+  to {
+    transform: translate3d(1.8%, 1.1%, 0);
+    opacity: 0.82;
+  }
 }
 
 @keyframes cityFloat {
