@@ -9,10 +9,29 @@
     return;
   }
 
+  const rainScene = document.querySelector(".rain-scene");
+  const prefersReducedMotion = window.matchMedia
+    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
+  const saveData = Boolean(navigator.connection && navigator.connection.saveData);
+  const lowEndDevice =
+    prefersReducedMotion ||
+    saveData ||
+    Number(navigator.hardwareConcurrency || 8) <= 4 ||
+    Number(navigator.deviceMemory || 8) <= 4;
+
   let width = 0;
   let height = 0;
   let dpr = 1;
   let lastTs = performance.now();
+  let frameCount = 0;
+  let lastFpsTs = performance.now();
+  let sceneVarTick = 0;
+  let skipRender = false;
+  let running = true;
+  let rafId = 0;
+  let qualityScale = lowEndDevice ? 0.5 : 0.84;
+  let minFrameMs = lowEndDevice ? 22 : 16;
 
   const pointer = {
     x: 0,
@@ -50,7 +69,8 @@
     drop.x = rand(-20, width + 20);
     drop.y = toTop ? rand(-height * 0.4, 0) : rand(-height, height);
     drop.len = rand(layer.lenMin, layer.lenMax);
-    drop.speed = rand(layer.speedMin, layer.speedMax);
+    drop.vy = rand(layer.speedMin, layer.speedMax);
+    drop.gravity = rand(layer.gravityMin, layer.gravityMax);
     drop.alpha = rand(layer.alphaMin, layer.alphaMax);
     drop.windFactor = rand(layer.windMin, layer.windMax);
   }
@@ -95,7 +115,7 @@
   }
 
   function setSize() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    dpr = Math.min(window.devicePixelRatio || 1, lowEndDevice ? 1.25 : 1.6);
     width = window.innerWidth;
     height = window.innerHeight;
 
@@ -108,14 +128,19 @@
 
     const mobile = width < 760;
     const density = clamp((width * height) / (1920 * 1080), 0.55, 1.65);
+    const effectiveDensity = density * qualityScale;
 
     layers.length = 0;
     beads.length = 0;
+    splashes.length = 0;
+    ripples.length = 0;
 
     buildLayer({
-      count: Math.floor((mobile ? 110 : 170) * density),
+      count: Math.floor((mobile ? 52 : 94) * effectiveDensity),
       speedMin: 4,
       speedMax: 7,
+      gravityMin: 0.008,
+      gravityMax: 0.018,
       lenMin: 10,
       lenMax: 20,
       alphaMin: 0.06,
@@ -128,9 +153,11 @@
     });
 
     buildLayer({
-      count: Math.floor((mobile ? 150 : 250) * density),
+      count: Math.floor((mobile ? 82 : 142) * effectiveDensity),
       speedMin: 7,
       speedMax: 11,
+      gravityMin: 0.011,
+      gravityMax: 0.024,
       lenMin: 14,
       lenMax: 28,
       alphaMin: 0.08,
@@ -143,9 +170,11 @@
     });
 
     buildLayer({
-      count: Math.floor((mobile ? 210 : 340) * density),
+      count: Math.floor((mobile ? 106 : 182) * effectiveDensity),
       speedMin: 11,
       speedMax: 16,
+      gravityMin: 0.015,
+      gravityMax: 0.032,
       lenMin: 18,
       lenMax: 34,
       alphaMin: 0.11,
@@ -157,8 +186,8 @@
       color: [212, 243, 255],
     });
 
-    const beadCount = Math.floor((mobile ? 120 : 210) * density);
-    const fgBeadCount = Math.floor((mobile ? 36 : 64) * density);
+    const beadCount = Math.floor((mobile ? 44 : 78) * effectiveDensity);
+    const fgBeadCount = Math.floor((mobile ? 7 : 13) * effectiveDensity);
 
     for (let i = 0; i < beadCount; i += 1) {
       const bead = {};
@@ -181,7 +210,11 @@
   }
 
   function spawnSplash(x, y, power = 1) {
-    const count = Math.floor(14 + power * 10);
+    if (splashes.length > (lowEndDevice ? 80 : 200)) {
+      return;
+    }
+
+    const count = Math.floor((lowEndDevice ? 6 : 10) + power * (lowEndDevice ? 4 : 8));
     for (let i = 0; i < count; i += 1) {
       const a = rand(0, Math.PI * 2);
       const v = rand(0.8, 3.2) * power;
@@ -197,43 +230,33 @@
       });
     }
 
-    ripples.push({
-      x,
-      y,
-      radius: 6,
-      speed: 120 + power * 90,
-      alpha: 0.32,
-      width: 1 + power * 0.35,
-    });
+    if (ripples.length < (lowEndDevice ? 14 : 44)) {
+      ripples.push({
+        x,
+        y,
+        radius: 6,
+        speed: 120 + power * 90,
+        alpha: 0.32,
+        width: 1 + power * 0.35,
+      });
+    }
   }
 
   function drawBead(x, y, radius, alpha, large = false) {
-    const spread = large ? 3.1 : 2.35;
-    const grad = ctx.createRadialGradient(
-      x - radius * 0.45,
-      y - radius * 0.48,
-      0,
-      x,
-      y,
-      radius * spread
-    );
-
-    grad.addColorStop(0, `rgba(228, 248, 255, ${alpha})`);
-    grad.addColorStop(0.38, `rgba(190, 230, 244, ${alpha * 0.62})`);
-    grad.addColorStop(1, "rgba(125, 185, 210, 0)");
-
-    ctx.fillStyle = grad;
+    // Lightweight bead rendering keeps frame time stable on low-end devices.
+    ctx.fillStyle = `rgba(210, 239, 252, ${alpha * (large ? 0.82 : 0.64)})`;
     ctx.beginPath();
-    ctx.arc(x, y, radius * (large ? 2.4 : 2.05), 0, Math.PI * 2);
+    ctx.arc(x, y, radius * (large ? 1.58 : 1.34), 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * (large ? 0.34 : 0.24)})`;
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * (large ? 0.26 : 0.2)})`;
     ctx.beginPath();
-    ctx.arc(x - radius * 0.42, y - radius * 0.35, radius * (large ? 0.55 : 0.43), 0, Math.PI * 2);
+    ctx.arc(x - radius * 0.35, y - radius * 0.32, radius * (large ? 0.42 : 0.34), 0, Math.PI * 2);
     ctx.fill();
   }
 
   function drawForegroundTrail(bead, parallaxX, parallaxY) {
+    if (lowEndDevice) return;
     if (!bead.trail || bead.trail.length < 2) return;
 
     ctx.beginPath();
@@ -258,6 +281,11 @@
   }
 
   function drawForegroundBead(bead, x, y, currentWind) {
+    if (lowEndDevice) {
+      drawBead(x, y, Math.max(1.6, bead.r * 0.9), bead.alpha * 0.95, true);
+      return;
+    }
+
     const angle = Math.atan2(bead.vy + 0.25, bead.vx + currentWind * 0.01);
     const stretch = bead.stretch || 3.6;
 
@@ -292,17 +320,64 @@
   }
 
   function animate(ts) {
-    requestAnimationFrame(animate);
+    if (!running) {
+      return;
+    }
+    rafId = requestAnimationFrame(animate);
 
-    const dt = Math.min(0.034, (ts - lastTs) / 1000);
+    if (skipRender) {
+      lastTs = ts;
+      return;
+    }
+
+    const elapsedMs = ts - lastTs;
+    if (elapsedMs < minFrameMs) {
+      return;
+    }
+
+    const dt = Math.min(0.034, elapsedMs / 1000);
     lastTs = ts;
+    frameCount += 1;
+
+    if (ts - lastFpsTs > 1400) {
+      const fps = (frameCount * 1000) / (ts - lastFpsTs);
+      frameCount = 0;
+      lastFpsTs = ts;
+      const minQuality = lowEndDevice ? 0.38 : 0.5;
+      if (fps < 30 && qualityScale > minQuality) {
+        qualityScale = Math.max(minQuality, qualityScale - 0.1);
+        setSize();
+      } else if (!lowEndDevice && fps > 56 && qualityScale < 0.95) {
+        qualityScale = Math.min(0.95, qualityScale + 0.04);
+        setSize();
+      }
+
+      if (fps < 28) {
+        minFrameMs = Math.min(lowEndDevice ? 30 : 22, minFrameMs + 2);
+      } else if (fps > 52) {
+        minFrameMs = Math.max(lowEndDevice ? 20 : 16, minFrameMs - 1);
+      }
+    }
 
     pointer.x += (pointer.targetX - pointer.x) * 0.13;
     pointer.y += (pointer.targetY - pointer.y) * 0.13;
 
-    const speed = Math.hypot(pointer.vx, pointer.vy);
+    if (ts - pointer.lastMoveTs > 1200) {
+      pointer.active = false;
+    }
+    pointer.vx *= 0.94;
+    pointer.vy *= 0.94;
+
     const parallaxX = (pointer.x - width * 0.5) * 0.03;
     const parallaxY = (pointer.y - height * 0.5) * 0.022;
+    const cinematicDriftX = Math.sin(ts * 0.00013) * 8;
+    const cinematicDriftY = Math.cos(ts * 0.00011) * 5;
+
+    sceneVarTick += 1;
+    if (rainScene && sceneVarTick % (lowEndDevice ? 4 : 2) === 0) {
+      rainScene.style.setProperty("--rx", `${(parallaxX + cinematicDriftX).toFixed(2)}px`);
+      rainScene.style.setProperty("--ry", `${(parallaxY + cinematicDriftY).toFixed(2)}px`);
+    }
 
     windTarget = ((pointer.x / width) - 0.5) * 170 + pointer.vx * 0.1;
     wind += (windTarget - wind) * 0.045;
@@ -311,11 +386,11 @@
     const currentWind = wind + gust;
 
     flashTimer -= dt;
-    if (flashTimer <= 0 && Math.random() < 0.00085) {
-      flash = rand(0.08, 0.19);
-      flashTimer = rand(4.8, 10.5);
+    if (flashTimer <= 0 && Math.random() < (lowEndDevice ? 0.00045 : 0.00085)) {
+      flash = rand(0.06, lowEndDevice ? 0.13 : 0.19);
+      flashTimer = rand(5.5, 11.5);
     }
-    flash *= 0.92;
+    flash *= lowEndDevice ? 0.88 : 0.92;
 
     ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = "rgba(8, 24, 32, 0.18)";
@@ -328,8 +403,27 @@
       ctx.lineWidth = layer.lineWidth;
 
       for (const drop of layer.drops) {
-        drop.y += drop.speed * dt * 60;
-        drop.x += (currentWind * drop.windFactor) * dt;
+        drop.vy += drop.gravity * dt * 60;
+        drop.y += drop.vy * dt * 60;
+
+        let pointerShift = 0;
+        if (pointer.active) {
+          const dx = drop.x - pointer.x;
+          const dy = drop.y - pointer.y;
+          const range = 70 + layer.parallax * 190;
+          const rangeSq = range * range;
+          const distSq = dx * dx + dy * dy;
+
+          if (distSq < rangeSq) {
+            const dist = Math.sqrt(distSq) || 1;
+            const falloff = 1 - dist / range;
+            const side = dx >= 0 ? 1 : -1;
+            pointerShift =
+              (pointer.vx * 0.88 + side * 18) * falloff * (0.38 + layer.parallax * 0.66);
+          }
+        }
+
+        drop.x += ((currentWind + pointerShift) * drop.windFactor) * dt;
 
         if (drop.y > height + drop.len + 20) {
           resetLayerDrop(drop, layer, true);
@@ -369,7 +463,7 @@
           bead.vx += nx * force * (bead.foreground ? 0.2 : 0.1) + swirlX * force;
           bead.vy += ny * force * (bead.foreground ? 0.12 : 0.06) + swirlY * force;
 
-          if (bead.foreground && force > 0.86 && Math.random() < 0.004) {
+          if (!lowEndDevice && bead.foreground && force > 0.86 && Math.random() < 0.0035) {
             spawnSplash(bead.x, bead.y, 0.75);
           }
         }
@@ -381,15 +475,15 @@
       bead.vx *= 0.987;
       bead.vy *= 0.993;
 
-      if (bead.foreground) {
+      if (bead.foreground && !lowEndDevice) {
         bead.trail.push({ x: bead.x, y: bead.y });
-        if (bead.trail.length > 9) {
+        if (bead.trail.length > 8) {
           bead.trail.shift();
         }
       }
 
       if (bead.y > height + 42 || bead.x < -42 || bead.x > width + 42) {
-        if (bead.foreground && bead.y > height + 10) {
+        if (!lowEndDevice && bead.foreground && bead.y > height + 10) {
           spawnSplash(bead.x, height - rand(6, 18), 0.65);
         }
         if (bead.foreground) {
@@ -475,7 +569,7 @@
     pointer.active = true;
 
     const speed = Math.hypot(pointer.vx, pointer.vy);
-    if (speed > 16 && now - pointer.lastSplashTs > 65) {
+    if (speed > (lowEndDevice ? 22 : 18) && now - pointer.lastSplashTs > (lowEndDevice ? 150 : 75)) {
       pointer.lastSplashTs = now;
       spawnSplash(clientX, clientY, clamp(speed / 26, 0.55, 1.85));
     }
@@ -500,15 +594,15 @@
   );
 
   window.addEventListener("click", (event) => {
-    spawnSplash(event.clientX, event.clientY, 1.9);
-    flash = Math.max(flash, 0.08);
+    spawnSplash(event.clientX, event.clientY, lowEndDevice ? 0.95 : 1.9);
+    flash = Math.max(flash, lowEndDevice ? 0.05 : 0.08);
   });
 
   window.addEventListener("touchstart", (event) => {
     if (!event.touches.length) return;
     const touch = event.touches[0];
-    spawnSplash(touch.clientX, touch.clientY, 1.7);
-    flash = Math.max(flash, 0.07);
+    spawnSplash(touch.clientX, touch.clientY, lowEndDevice ? 0.9 : 1.7);
+    flash = Math.max(flash, lowEndDevice ? 0.05 : 0.07);
   });
 
   window.addEventListener("mouseleave", () => {
@@ -519,6 +613,26 @@
 
   window.addEventListener("resize", setSize);
 
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      skipRender = true;
+    } else {
+      skipRender = false;
+      lastTs = performance.now();
+    }
+  });
+
+  if (lowEndDevice) {
+    document.body.classList.add("perf-lite");
+  }
+
   setSize();
-  requestAnimationFrame(animate);
+  rafId = requestAnimationFrame(animate);
+
+  window.addEventListener("beforeunload", () => {
+    running = false;
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+    }
+  });
 })();
