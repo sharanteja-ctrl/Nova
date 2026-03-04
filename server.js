@@ -330,7 +330,8 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
 
     const compressionRatio = targetBytes / Math.max(1, originalSize);
     const aggressiveTarget = compressionRatio <= 0.2;
-    const effectiveHardRasterMode = hardRasterMode || aggressiveTarget;
+    // Keep default mode clarity-first: rasterization is only allowed when user enables Heavy Compression.
+    const effectiveHardRasterMode = hardRasterMode;
     const shouldPreferRasterFirst = effectiveHardRasterMode && aggressiveTarget;
     const profiles = shouldPreferRasterFirst
       ? []
@@ -427,8 +428,8 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
       }
     }
 
-    // Final squeeze pass on best output when still above target.
-    if (!firstUnderTargetPath && bestPath) {
+    // Final squeeze pass is only for Heavy Compression mode because very low resolutions can blur content.
+    if (!firstUnderTargetPath && bestPath && effectiveHardRasterMode) {
       const squeezeProfiles = [
         { pdfSettings: "screen", resolution: 36, monoResolution: 60 },
         { pdfSettings: "screen", resolution: 24, monoResolution: 40 },
