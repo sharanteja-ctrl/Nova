@@ -30,6 +30,28 @@
       name="twitter:image"
       content="https://nova-converter.onrender.com/assets/icon.svg"
     />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Nova Converter",
+        "url": "https://nova-converter.onrender.com/",
+        "logo": "https://nova-converter.onrender.com/assets/icon.svg"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "url": "https://nova-converter.onrender.com/",
+        "name": "Nova Converter",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://nova-converter.onrender.com/?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
     <meta name="theme-color" content="#000000" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -41,7 +63,7 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260304-16" />
+    <link rel="stylesheet" href="styles.css?v=20260304-17" />
   </head>
   <body>
     <video class="bg-video" autoplay muted loop playsinline>
@@ -61,7 +83,7 @@
 
       <section class="hero">
         <h1>Nova Converter</h1>
-        <p class="subtitle">Fast • Secure • High Quality Compression</p>
+        <p class="subtitle">Fast • Secure • High Quality Compression • Mobile-ready</p>
       </section>
 
       <div class="card">
@@ -141,7 +163,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="app.js?v=20260304-16"></script>
+    <script src="app.js?v=20260304-17"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
