@@ -5,7 +5,7 @@ It supports browser-side conversion for text/images and server-side conversion f
 
 ## Live Website
 
-- https://nova-converter-9h21.onrender.com
+- https://nova-converter.onrender.com/
 
 ## Features
 
