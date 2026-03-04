@@ -63,7 +63,7 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260304-19" />
+    <link rel="stylesheet" href="styles.css?v=20260304-20" />
   </head>
   <body>
     <video class="bg-video" autoplay muted loop playsinline preload="metadata">
@@ -175,9 +175,17 @@
       </section>
 
       <section class="info-section" id="contact">
-        <h2>Need Help?</h2>
-        <p class="contact-copy">Questions or feedback? Reach out and we’ll assist.</p>
-        <a class="contact-btn" href="mailto:sharanteja.815@gmail.com">Email Support</a>
+        <a class="contact-card" href="mailto:sharanteja.815@gmail.com">
+          <div class="contact-head">
+            <div class="contact-pill">Support</div>
+            <h2>Need Help?</h2>
+          </div>
+          <p class="contact-copy">Questions or feedback? Reach out and we’ll assist.</p>
+          <div class="contact-cta">
+            <span>Email Support</span>
+            <span class="contact-arrow">→</span>
+          </div>
+        </a>
       </section>
 
     </div>
@@ -185,7 +193,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="app.js?v=20260304-19"></script>
+    <script src="app.js?v=20260304-20"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {

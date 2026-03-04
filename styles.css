@@ -1050,19 +1050,46 @@ button.convert[disabled]::before {
   opacity: 0.9;
 }
 
-.contact-btn {
-  display: inline-block;
-  padding: 10px 14px;
-  border-radius: 10px;
+.contact-card {
+  display: block;
+  border-radius: 14px;
+  padding: 16px;
   border: 1px solid var(--soft-border);
-  background: linear-gradient(120deg, #2b2b2b, #000);
-  color: #fff;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  color: var(--text);
   text-decoration: none;
-  font-weight: 600;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.contact-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(255, 255, 255, 0.18);
+.contact-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.5);
+}
+
+.contact-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.contact-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+.contact-cta {
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.contact-arrow {
+  font-size: 1.1rem;
 }
