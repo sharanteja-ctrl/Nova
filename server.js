@@ -185,32 +185,29 @@ async function buildPdfFromImages(imagePaths, outputPath, timeoutMs = 90000) {
 }
 
 function getFastCompressionProfiles(compressionRatio, ultraMode) {
-  // Keep default requests fast: 1-3 passes max.
-  const quickHigh = { pdfSettings: "ebook", resolution: 150, monoResolution: 240 };
-  const quickMid = { pdfSettings: "screen", resolution: 120, monoResolution: 180 };
-  const quickLow = { pdfSettings: "screen", resolution: 96, monoResolution: 144 };
-  const deepLow = { pdfSettings: "screen", resolution: 72, monoResolution: 120 };
+  // Speed-first, clarity-safe: max 2 passes.
+  const quickHigh = { pdfSettings: "ebook", resolution: 150, monoResolution: 230 };
+  const quickMid = { pdfSettings: "screen", resolution: 124, monoResolution: 190 };
+  const quickLow = { pdfSettings: "screen", resolution: 108, monoResolution: 160 };
+  const ultraLow = { pdfSettings: "screen", resolution: 100, monoResolution: 150 };
 
   if (ultraMode) {
-    // Clarity-safe ultra profiles: avoid very low resolutions that introduce blur.
-    return [
-      quickHigh,
-      { pdfSettings: "ebook", resolution: 135, monoResolution: 220 },
-      quickMid,
-      { pdfSettings: "screen", resolution: 110, monoResolution: 170 },
-    ];
-  }
-
-  if (compressionRatio >= 0.85) {
-    return [quickHigh];
-  }
-  if (compressionRatio >= 0.7) {
+    if (compressionRatio < 0.35) {
+      return [quickLow, ultraLow];
+    }
+    if (compressionRatio < 0.55) {
+      return [quickMid, quickLow];
+    }
     return [quickHigh, quickMid];
   }
-  if (compressionRatio >= 0.55) {
-    return [quickMid, quickLow];
+
+  if (compressionRatio >= 0.8) {
+    return [quickHigh];
   }
-  return [quickLow, deepLow];
+  if (compressionRatio >= 0.6) {
+    return [quickMid];
+  }
+  return [quickLow];
 }
 
 function getFastHardRasterProfiles(ultraMode, compressionRatio) {
@@ -311,7 +308,6 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
     return res.status(400).json({ error: "Valid targetBytes is required." });
   }
   const ultraMode = String(req.body.ultraMode || "0") === "1";
-  const hardRasterMode = String(req.body.hardRasterMode || "0") === "1";
 
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "pdf-compress-"));
   const inputPath = path.join(tempRoot, originalName);
@@ -329,50 +325,14 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
     }
 
     const compressionRatio = targetBytes / Math.max(1, originalSize);
-    const aggressiveTarget = compressionRatio <= 0.2;
-    // Keep default mode clarity-first: rasterization is only allowed when user enables Heavy Compression.
-    const effectiveHardRasterMode = hardRasterMode;
-    const shouldPreferRasterFirst = effectiveHardRasterMode && aggressiveTarget;
-    const profiles = shouldPreferRasterFirst
-      ? []
-      : effectiveHardRasterMode
-      ? [getFastCompressionProfiles(compressionRatio, ultraMode)[0]]
-      : getFastCompressionProfiles(compressionRatio, ultraMode);
+    // Raster pipeline is disabled for clarity + speed in current product behavior.
+    const effectiveHardRasterMode = false;
+    const profiles = getFastCompressionProfiles(compressionRatio, ultraMode);
 
     let bestPath = null;
     let bestSize = Number.POSITIVE_INFINITY;
     let firstUnderTargetPath = null;
     let lastStepError = null;
-
-    // Ultra-fast path: direct raster based on ratio, before any multi-pass loops.
-    if (shouldPreferRasterFirst) {
-      const fastDpis = pickAggressiveRasterDpis(compressionRatio);
-      for (let i = 0; i < fastDpis.length; i += 1) {
-        const outPath = path.join(tempRoot, `fast-raster-${i}.pdf`);
-        try {
-          await rasterizePdfDirectToPdf(
-            inputPath,
-            outPath,
-            fastDpis[i],
-            Math.max(8, Math.min(32, Math.floor(50 * compressionRatio))),
-            "color",
-            140000
-          );
-          const stat = await fs.stat(outPath);
-          const currentSize = stat.size;
-          if (currentSize < bestSize) {
-            bestSize = currentSize;
-            bestPath = outPath;
-          }
-          if (currentSize <= targetBytes) {
-            firstUnderTargetPath = outPath;
-            break;
-          }
-        } catch (error) {
-          lastStepError = error;
-        }
-      }
-    }
 
     for (let i = 0; i < profiles.length; i += 1) {
       const outPath = path.join(tempRoot, `compressed-${i}.pdf`);
