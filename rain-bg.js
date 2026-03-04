@@ -65,6 +65,8 @@
     bead.phase = rand(0, Math.PI * 2);
     bead.wobble = rand(0.7, 2.1);
     bead.alpha = rand(0.1, 0.3);
+    bead.trail = [];
+    bead.foreground = false;
   }
 
   function resetForegroundBead(bead, toTop = false) {
@@ -77,7 +79,9 @@
     bead.phase = rand(0, Math.PI * 2);
     bead.wobble = rand(0.7, 1.6);
     bead.alpha = rand(0.17, 0.36);
+    bead.stretch = rand(2.8, 4.6);
     bead.foreground = true;
+    bead.trail = [];
   }
 
   function buildLayer(config) {
@@ -109,7 +113,7 @@
     beads.length = 0;
 
     buildLayer({
-      count: Math.floor((mobile ? 95 : 130) * density),
+      count: Math.floor((mobile ? 110 : 170) * density),
       speedMin: 4,
       speedMax: 7,
       lenMin: 10,
@@ -124,7 +128,7 @@
     });
 
     buildLayer({
-      count: Math.floor((mobile ? 125 : 190) * density),
+      count: Math.floor((mobile ? 150 : 250) * density),
       speedMin: 7,
       speedMax: 11,
       lenMin: 14,
@@ -139,7 +143,7 @@
     });
 
     buildLayer({
-      count: Math.floor((mobile ? 150 : 250) * density),
+      count: Math.floor((mobile ? 210 : 340) * density),
       speedMin: 11,
       speedMax: 16,
       lenMin: 18,
@@ -153,8 +157,8 @@
       color: [212, 243, 255],
     });
 
-    const beadCount = Math.floor((mobile ? 100 : 160) * density);
-    const fgBeadCount = Math.floor((mobile ? 28 : 46) * density);
+    const beadCount = Math.floor((mobile ? 120 : 210) * density);
+    const fgBeadCount = Math.floor((mobile ? 36 : 64) * density);
 
     for (let i = 0; i < beadCount; i += 1) {
       const bead = {};
@@ -229,6 +233,64 @@
     ctx.fill();
   }
 
+  function drawForegroundTrail(bead, parallaxX, parallaxY) {
+    if (!bead.trail || bead.trail.length < 2) return;
+
+    ctx.beginPath();
+    for (let i = 0; i < bead.trail.length; i += 1) {
+      const p = bead.trail[i];
+      const px = p.x + parallaxX * 0.82;
+      const py = p.y + parallaxY * 0.76;
+      if (i === 0) {
+        ctx.moveTo(px, py);
+      } else {
+        const prev = bead.trail[i - 1];
+        const cpx = (prev.x + p.x) * 0.5 + parallaxX * 0.82;
+        const cpy = (prev.y + p.y) * 0.5 + parallaxY * 0.76;
+        ctx.quadraticCurveTo(cpx, cpy, px, py);
+      }
+    }
+
+    const tAlpha = bead.alpha * 0.26;
+    ctx.strokeStyle = `rgba(192, 234, 248, ${tAlpha})`;
+    ctx.lineWidth = Math.max(0.6, bead.r * 0.32);
+    ctx.stroke();
+  }
+
+  function drawForegroundBead(bead, x, y, currentWind) {
+    const angle = Math.atan2(bead.vy + 0.25, bead.vx + currentWind * 0.01);
+    const stretch = bead.stretch || 3.6;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle + Math.PI / 2);
+
+    const r = bead.r;
+    const alpha = bead.alpha;
+
+    const dropGrad = ctx.createRadialGradient(-r * 0.34, -r * 0.42, 0, 0, 0, r * 3.2);
+    dropGrad.addColorStop(0, `rgba(235, 249, 255, ${alpha})`);
+    dropGrad.addColorStop(0.42, `rgba(188, 231, 246, ${alpha * 0.66})`);
+    dropGrad.addColorStop(1, "rgba(122, 183, 208, 0)");
+    ctx.fillStyle = dropGrad;
+
+    ctx.beginPath();
+    ctx.moveTo(0, -r * stretch);
+    ctx.bezierCurveTo(r * 1.35, -r * 1.2, r * 1.55, r * 1.45, 0, r * 2.25);
+    ctx.bezierCurveTo(-r * 1.55, r * 1.45, -r * 1.35, -r * 1.2, 0, -r * stretch);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.38})`;
+    ctx.lineWidth = Math.max(0.5, r * 0.16);
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.3, -r * 1.85);
+    ctx.quadraticCurveTo(-r * 0.1, -r * 0.25, -r * 0.02, r * 0.5);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   function animate(ts) {
     requestAnimationFrame(animate);
 
@@ -242,10 +304,10 @@
     const parallaxX = (pointer.x - width * 0.5) * 0.03;
     const parallaxY = (pointer.y - height * 0.5) * 0.022;
 
-    windTarget = ((pointer.x / width) - 0.5) * 150 + pointer.vx * 0.07;
+    windTarget = ((pointer.x / width) - 0.5) * 170 + pointer.vx * 0.1;
     wind += (windTarget - wind) * 0.045;
 
-    const gust = Math.sin(ts * 0.00028) * 14;
+    const gust = Math.sin(ts * 0.00028) * 16 + Math.sin(ts * 0.00011) * 10;
     const currentWind = wind + gust;
 
     flashTimer -= dt;
@@ -255,7 +317,9 @@
     }
     flash *= 0.92;
 
-    ctx.clearRect(0, 0, width, height);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(8, 24, 32, 0.18)";
+    ctx.fillRect(0, 0, width, height);
 
     ctx.lineCap = "round";
 
@@ -280,7 +344,7 @@
 
         ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${drop.alpha})`;
         ctx.beginPath();
-        ctx.moveTo(x - tilt * 0.8, y - drop.len);
+        ctx.moveTo(x - tilt * 0.95, y - drop.len);
         ctx.lineTo(x + tilt, y);
         ctx.stroke();
       }
@@ -295,10 +359,19 @@
         const dx = bead.x - pointer.x;
         const dy = bead.y - pointer.y;
         const dist = Math.hypot(dx, dy) || 1;
-        if (dist < 150) {
-          const force = (150 - dist) / 150;
-          bead.vx += (dx / dist) * force * 0.08 * (1 + speed * 0.02);
-          bead.vy += (dy / dist) * force * 0.05;
+        const influence = bead.foreground ? 220 : 155;
+        if (dist < influence) {
+          const force = (influence - dist) / influence;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const swirlX = -ny * pointer.vx * 0.009;
+          const swirlY = nx * pointer.vy * 0.007;
+          bead.vx += nx * force * (bead.foreground ? 0.2 : 0.1) + swirlX * force;
+          bead.vy += ny * force * (bead.foreground ? 0.12 : 0.06) + swirlY * force;
+
+          if (bead.foreground && force > 0.86 && Math.random() < 0.004) {
+            spawnSplash(bead.x, bead.y, 0.75);
+          }
         }
       }
 
@@ -308,7 +381,17 @@
       bead.vx *= 0.987;
       bead.vy *= 0.993;
 
+      if (bead.foreground) {
+        bead.trail.push({ x: bead.x, y: bead.y });
+        if (bead.trail.length > 9) {
+          bead.trail.shift();
+        }
+      }
+
       if (bead.y > height + 42 || bead.x < -42 || bead.x > width + 42) {
+        if (bead.foreground && bead.y > height + 10) {
+          spawnSplash(bead.x, height - rand(6, 18), 0.65);
+        }
         if (bead.foreground) {
           resetForegroundBead(bead, true);
         } else {
@@ -318,17 +401,22 @@
 
       const bx = bead.x + parallaxX * (bead.foreground ? 0.88 : 0.5);
       const by = bead.y + parallaxY * (bead.foreground ? 0.82 : 0.46);
-      const trailLen = bead.r * (bead.foreground ? 6.2 : 4.2);
-      const trailAlpha = bead.alpha * (bead.foreground ? 0.38 : 0.22);
+      const trailLen = bead.r * (bead.foreground ? 7.1 : 4.5);
+      const trailAlpha = bead.alpha * (bead.foreground ? 0.42 : 0.22);
 
       ctx.strokeStyle = `rgba(190, 232, 248, ${trailAlpha})`;
-      ctx.lineWidth = bead.r * (bead.foreground ? 0.35 : 0.23);
+      ctx.lineWidth = bead.r * (bead.foreground ? 0.38 : 0.23);
       ctx.beginPath();
-      ctx.moveTo(bx - currentWind * 0.015, by - trailLen);
+      ctx.moveTo(bx - currentWind * 0.018, by - trailLen);
       ctx.lineTo(bx, by);
       ctx.stroke();
 
-      drawBead(bx, by, bead.r, bead.alpha, Boolean(bead.foreground));
+      if (bead.foreground) {
+        drawForegroundTrail(bead, parallaxX, parallaxY);
+        drawForegroundBead(bead, bx, by, currentWind);
+      } else {
+        drawBead(bx, by, bead.r, bead.alpha, false);
+      }
     }
 
     for (let i = splashes.length - 1; i >= 0; i -= 1) {
@@ -387,9 +475,9 @@
     pointer.active = true;
 
     const speed = Math.hypot(pointer.vx, pointer.vy);
-    if (speed > 24 && now - pointer.lastSplashTs > 90) {
+    if (speed > 16 && now - pointer.lastSplashTs > 65) {
       pointer.lastSplashTs = now;
-      spawnSplash(clientX, clientY, clamp(speed / 34, 0.5, 1.4));
+      spawnSplash(clientX, clientY, clamp(speed / 26, 0.55, 1.85));
     }
   }
 
@@ -412,13 +500,15 @@
   );
 
   window.addEventListener("click", (event) => {
-    spawnSplash(event.clientX, event.clientY, 1.5);
+    spawnSplash(event.clientX, event.clientY, 1.9);
+    flash = Math.max(flash, 0.08);
   });
 
   window.addEventListener("touchstart", (event) => {
     if (!event.touches.length) return;
     const touch = event.touches[0];
-    spawnSplash(touch.clientX, touch.clientY, 1.35);
+    spawnSplash(touch.clientX, touch.clientY, 1.7);
+    flash = Math.max(flash, 0.07);
   });
 
   window.addEventListener("mouseleave", () => {

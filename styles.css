@@ -42,6 +42,17 @@ body {
   animation: sceneDrift 26s ease-in-out infinite alternate;
 }
 
+.rain-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.52) 0%, transparent 12%, transparent 86%, rgba(0, 0, 0, 0.52) 100%),
+    radial-gradient(120% 80% at 50% 50%, transparent 52%, rgba(0, 0, 0, 0.5) 100%);
+  z-index: 1;
+}
+
 .rain-scene::after {
   content: "";
   position: absolute;
@@ -55,6 +66,7 @@ body {
   filter: blur(28px);
   opacity: 0.74;
   animation: glowSweep 18s ease-in-out infinite alternate;
+  z-index: 2;
 }
 
 .city-blur {
@@ -115,6 +127,7 @@ body {
   height: 100%;
   pointer-events: none;
   opacity: 0.92;
+  z-index: 3;
 }
 
 .glass-noise {
@@ -136,6 +149,7 @@ body {
   mix-blend-mode: soft-light;
   opacity: 0.4;
   animation: grainDrift 6.5s steps(12, end) infinite;
+  z-index: 4;
 }
 
 @keyframes sceneDrift {
