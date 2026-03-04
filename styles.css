@@ -25,7 +25,9 @@ body {
   padding: 24px;
   overflow-x: hidden;
   overflow-y: auto;
-  background: #000;
+  background: radial-gradient(120% 120% at 20% 20%, rgba(66, 123, 255, 0.14), transparent 40%),
+    radial-gradient(120% 120% at 80% 10%, rgba(123, 69, 255, 0.16), transparent 42%),
+    #03030a;
   color: var(--text);
 }
 
