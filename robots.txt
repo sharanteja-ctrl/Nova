@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://nova-converter-9h21.onrender.com/sitemap.xml

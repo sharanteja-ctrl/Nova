@@ -1,11 +1,13 @@
-const CACHE_NAME = "nova-converter-v12";
+const CACHE_NAME = "nova-converter-v13";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/styles.css?v=20260304-11",
-  "/app.js?v=20260304-11",
+  "/styles.css?v=20260304-12",
+  "/app.js?v=20260304-12",
   "/manifest.webmanifest",
-  "/assets/icon.svg"
+  "/assets/icon.svg",
+  "/sitemap.xml",
+  "/robots.txt"
 ];
 
 self.addEventListener("message", (event) => {
