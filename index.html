@@ -63,15 +63,37 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260304-31" />
+    <link rel="stylesheet" href="styles.css?v=20260304-38" />
   </head>
   <body>
     <div class="rain-scene" aria-hidden="true">
       <div class="city-blur"></div>
       <div class="mist-overlay"></div>
       <canvas id="rainCanvas" class="rain-canvas"></canvas>
+      <div class="lens-bloom"></div>
       <div class="glass-noise"></div>
+      <div class="film-bars"></div>
     </div>
+
+    <button id="sideToggleBtn" class="side-toggle-btn" type="button" aria-label="Open menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <aside id="sideMenu" class="side-menu" aria-label="Main menu">
+      <div class="side-menu-head">
+        <div class="side-logo">Nova</div>
+        <button id="sideCloseBtn" class="side-close-btn" type="button" aria-label="Close menu">x</button>
+      </div>
+      <nav class="side-nav">
+        <a class="side-link active" href="/">Home</a>
+        <a class="side-link" href="/split.html">Split PDF</a>
+      </nav>
+      <div class="side-foot">Nova Converter</div>
+    </aside>
+
+    <div id="sideBackdrop" class="side-backdrop"></div>
 
     <div class="container">
       <div class="topbar">
@@ -184,7 +206,8 @@
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="rain-bg.js?v=20260304-31"></script>
+    <script src="rain-bg.js?v=20260304-36"></script>
+    <script src="menu.js?v=20260304-37"></script>
     <script src="app.js?v=20260304-21"></script>
     <script>
       if ("serviceWorker" in navigator) {

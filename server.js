@@ -17,6 +17,10 @@ const upload = multer({
 
 app.use(express.static(__dirname));
 
+app.get("/split", (req, res) => {
+  res.sendFile(path.join(__dirname, "split.html"));
+});
+
 function setProgress(progressId, progress, phase, status = "processing") {
   if (!progressId) {
     return;

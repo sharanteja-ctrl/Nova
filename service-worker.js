@@ -1,10 +1,14 @@
-const CACHE_NAME = "nova-converter-v31";
+const CACHE_NAME = "nova-converter-v38";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/styles.css?v=20260304-31",
+  "/split",
+  "/split.html",
+  "/styles.css?v=20260304-38",
   "/app.js?v=20260304-21",
-  "/rain-bg.js?v=20260304-31",
+  "/menu.js?v=20260304-37",
+  "/split.js?v=20260304-38",
+  "/rain-bg.js?v=20260304-36",
   "/manifest.webmanifest",
   "/assets/icon.svg",
   "/sitemap.xml",

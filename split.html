@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nova Converter - Split PDF</title>
+    <meta
+      name="description"
+      content="Split one PDF into multiple files by page, ranges, or selected pages."
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260304-38" />
+  </head>
+  <body class="split-tool-page">
+    <div class="rain-scene" aria-hidden="true">
+      <div class="city-blur"></div>
+      <div class="mist-overlay"></div>
+      <canvas id="rainCanvas" class="rain-canvas"></canvas>
+      <div class="lens-bloom"></div>
+      <div class="glass-noise"></div>
+      <div class="film-bars"></div>
+    </div>
+
+    <button id="sideToggleBtn" class="side-toggle-btn" type="button" aria-label="Open menu">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <aside id="sideMenu" class="side-menu" aria-label="Main menu">
+      <div class="side-menu-head">
+        <div class="side-logo">Nova</div>
+        <button id="sideCloseBtn" class="side-close-btn" type="button" aria-label="Close menu">x</button>
+      </div>
+      <nav class="side-nav">
+        <a class="side-link" href="/">Home</a>
+        <a class="side-link active" href="/split.html">Split PDF</a>
+      </nav>
+      <div class="side-foot">Nova Converter</div>
+    </aside>
+
+    <div id="sideBackdrop" class="side-backdrop"></div>
+
+    <div class="container split-page-container">
+      <div class="topbar">
+        <div class="logo-badge" aria-label="Nova Converter logo"></div>
+      </div>
+
+      <section class="hero">
+        <h1>Split PDF</h1>
+        <p class="subtitle">Split by page, ranges, or selected pages. Max file size: 100MB.</p>
+      </section>
+
+      <div class="card split-card">
+        <label id="splitDropzone" class="upload-box split-upload-box" for="splitFileInput">
+          <input id="splitFileInput" type="file" accept=".pdf,application/pdf" />
+          <div class="split-upload-icon" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <p id="splitFileInfo">Drag & drop PDF here or click to upload</p>
+          <p class="tick-hint">One file only. Up to 100MB.</p>
+        </label>
+
+        <div class="split-meta-grid">
+          <div class="split-meta-item">
+            <span class="split-meta-label">File</span>
+            <span id="splitFileName" class="split-meta-value">-</span>
+          </div>
+          <div class="split-meta-item">
+            <span class="split-meta-label">Pages</span>
+            <span id="splitPageCount" class="split-meta-value">-</span>
+          </div>
+        </div>
+
+        <div class="split-options">
+          <p class="split-option-title">Split Option</p>
+          <div class="split-option-row">
+            <label class="split-option-pill">
+              <input type="radio" name="splitMode" value="each" checked />
+              <span>Every page</span>
+            </label>
+            <label class="split-option-pill">
+              <input type="radio" name="splitMode" value="ranges" />
+              <span>Page ranges</span>
+            </label>
+            <label class="split-option-pill">
+              <input type="radio" name="splitMode" value="extract" />
+              <span>Extract selected</span>
+            </label>
+          </div>
+          <div id="splitRangeWrap" class="split-range-wrap hidden">
+            <label for="splitRanges">Ranges</label>
+            <input
+              id="splitRanges"
+              type="text"
+              class="custom-range-input"
+              placeholder="Example: 1-3, 4-6, 7-10"
+            />
+          </div>
+        </div>
+
+        <div class="split-page-tools">
+          <button id="selectAllPagesBtn" class="download split-small-btn" type="button">Select All</button>
+          <button id="clearPagesBtn" class="download split-small-btn" type="button">Clear</button>
+        </div>
+
+        <div id="splitThumbGrid" class="split-thumb-grid"></div>
+
+        <div id="splitProcessingWrap" class="split-processing-wrap hidden" aria-live="polite">
+          <div class="split-processing-head">
+            <div class="split-spinner" aria-hidden="true"></div>
+            <span id="splitProgressLabel">Processing...</span>
+          </div>
+          <div class="split-progress-track">
+            <div id="splitProgressBar" class="split-progress-bar"></div>
+          </div>
+          <div id="splitProgressPercent" class="split-progress-percent">0%</div>
+        </div>
+
+        <div class="buttons split-buttons">
+          <button id="splitBtn" class="convert split-main-btn" type="button" disabled>Split PDF</button>
+          <a id="splitZipDownloadLink" class="download hidden" download>Download All ZIP</a>
+        </div>
+
+        <div id="splitResultWrap" class="split-result-wrap hidden">
+          <p id="splitSuccessMsg" class="status split-success-msg"></p>
+          <div id="splitOutputList" class="split-output-list"></div>
+        </div>
+
+        <p id="splitStatus" class="status">Upload a PDF to start.</p>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <script src="rain-bg.js?v=20260304-36"></script>
+    <script src="menu.js?v=20260304-37"></script>
+    <script src="split.js?v=20260304-38"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/service-worker.js")
+            .then((registration) => {
+              registration.update();
+            })
+            .catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>
