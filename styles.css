@@ -38,6 +38,7 @@ body {
   height: 100%;
   z-index: -5;
   background: #000;
+  pointer-events: none;
 }
 
 .hero-ornaments {
