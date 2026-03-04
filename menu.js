@@ -9,15 +9,28 @@
   }
 
   const menuLinks = sideMenu.querySelectorAll(".side-link");
-  const currentPath = window.location.pathname.toLowerCase();
+
+  function normalizePath(value) {
+    const raw = String(value || "/").toLowerCase().split("?")[0].split("#")[0];
+    const stripped = raw.replace(/\/+$/, "");
+    return stripped || "/";
+  }
+
+  const currentPath = normalizePath(window.location.pathname);
   menuLinks.forEach((link) => {
-    const href = link.getAttribute("href") || "";
-    const normalized = href.toLowerCase();
-    const isHome =
-      (currentPath === "/" || currentPath.endsWith("/index.html")) &&
-      (normalized === "/" || normalized.endsWith("/index.html"));
-    const isExact = normalized !== "/" && currentPath.endsWith(normalized);
-    link.classList.toggle("active", isHome || isExact);
+    const href = link.getAttribute("href") || "/";
+    const target = normalizePath(href);
+    let active = false;
+
+    if (target === "/" || target === "/index.html") {
+      active = currentPath === "/" || currentPath === "/index.html";
+    } else if (target === "/split" || target === "/split.html") {
+      active = currentPath === "/split" || currentPath === "/split.html";
+    } else {
+      active = currentPath === target;
+    }
+
+    link.classList.toggle("active", active);
   });
 
   function openMenu() {
