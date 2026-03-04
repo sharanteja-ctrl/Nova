@@ -63,9 +63,16 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260304-28" />
+    <link rel="stylesheet" href="styles.css?v=20260304-29" />
   </head>
   <body>
+    <div class="rain-scene" aria-hidden="true">
+      <div class="city-blur"></div>
+      <div class="mist-overlay"></div>
+      <canvas id="rainCanvas" class="rain-canvas"></canvas>
+      <div class="glass-noise"></div>
+    </div>
+
     <div class="container">
       <div class="topbar">
         <div class="logo-badge" aria-label="Nova Converter logo"></div>
@@ -177,6 +184,7 @@
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="rain-bg.js?v=20260304-29"></script>
     <script src="app.js?v=20260304-21"></script>
     <script>
       if ("serviceWorker" in navigator) {
