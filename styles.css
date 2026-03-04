@@ -348,38 +348,6 @@ h1 {
   opacity: 0.75;
 }
 
-.quick-1mb {
-  margin-top: 10px;
-  margin-left: 34px;
-  width: auto;
-  min-width: 86px;
-  padding: 7px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: linear-gradient(135deg, #ff5f6d, #ffc371);
-  color: #111;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  box-shadow: 0 0 0 rgba(255, 95, 109, 0.3);
-  animation: quickPulse 1.6s ease-in-out infinite;
-}
-
-.quick-1mb:hover {
-  transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 8px 16px rgba(255, 95, 109, 0.35);
-}
-
-@keyframes quickPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 rgba(255, 95, 109, 0.28);
-  }
-  50% {
-    box-shadow: 0 0 14px rgba(255, 95, 109, 0.45);
-  }
-}
-
 .light-mode .tick-box {
   border-color: rgba(0, 0, 0, 0.7);
 }

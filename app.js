@@ -9,7 +9,6 @@ const dropzone = document.getElementById("dropzone");
 const targetSizeInput = document.getElementById("targetSizeInput");
 const targetUnitSelect = document.getElementById("targetUnitSelect");
 const maxCompressionInput = document.getElementById("maxCompressionInput");
-const quick1mbBtn = document.getElementById("quick1mbBtn");
 const loadingWrap = document.getElementById("loadingWrap");
 const loadingBar = document.getElementById("loadingBar");
 const loadingLabel = document.getElementById("loadingLabel");
@@ -774,21 +773,6 @@ fileInput.addEventListener("change", (event) => {
 });
 
 convertBtn.addEventListener("click", handleConvert);
-
-quick1mbBtn?.addEventListener("click", async () => {
-  targetSizeInput.value = "1";
-  targetUnitSelect.value = "MB";
-  if (maxCompressionInput) {
-    maxCompressionInput.checked = true;
-  }
-
-  if (!selectedFiles.length) {
-    setStatus("Select a PDF first, then tap 1MB Quick.");
-    return;
-  }
-
-  await handleConvert();
-});
 
 ["dragenter", "dragover"].forEach((eventName) => {
   dropzone.addEventListener(eventName, (event) => {
