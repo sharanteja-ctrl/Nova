@@ -29,57 +29,13 @@ body {
   color: var(--text);
 }
 
-.bg-3d {
+.bg-canvas {
   position: fixed;
   inset: 0;
-  z-index: -4;
-  overflow: hidden;
-  background: radial-gradient(circle at 40% 20%, rgba(255, 255, 255, 0.12), transparent 36%),
-    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.1), transparent 46%),
-    #050505;
-  perspective: 900px;
-}
-
-.bg-3d .grid {
-  position: absolute;
-  inset: -30%;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: 140px 140px;
-  transform: rotateX(68deg) rotateZ(-8deg) translateY(-8vh) scale(1.2);
-  transform-origin: center;
-  animation: gridDrift 28s linear infinite;
-  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.08));
-}
-
-.bg-3d .glow {
-  position: absolute;
-  inset: -10%;
-  background: radial-gradient(circle at 50% 70%, rgba(255, 255, 255, 0.12), transparent 40%);
-  mix-blend-mode: screen;
-  filter: blur(20px);
-  animation: glowPulse 10s ease-in-out infinite alternate;
-}
-
-@keyframes gridDrift {
-  0% {
-    transform: rotateX(68deg) rotateZ(-8deg) translateY(-8vh) translateX(0) scale(1.2);
-  }
-  100% {
-    transform: rotateX(68deg) rotateZ(-2deg) translateY(-4vh) translateX(18px) scale(1.25);
-  }
-}
-
-@keyframes glowPulse {
-  from {
-    opacity: 0.35;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0.58;
-    transform: scale(1.07);
-  }
+  width: 100%;
+  height: 100%;
+  z-index: -5;
+  background: #000;
 }
 
 .hero-ornaments {
