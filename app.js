@@ -10,6 +10,13 @@ const previewBtn = document.getElementById("previewBtn");
 const previewWrap = document.getElementById("previewWrap");
 const previewFrame = document.getElementById("previewFrame");
 const previewCloseBtn = document.getElementById("previewCloseBtn");
+const chatFileInput = document.getElementById("chatFileInput");
+const chatFileInfo = document.getElementById("chatFileInfo");
+const chatDropzone = document.getElementById("chatDropzone");
+const chatQuestion = document.getElementById("chatQuestion");
+const chatSendBtn = document.getElementById("chatSendBtn");
+const chatStatus = document.getElementById("chatStatus");
+const chatAnswer = document.getElementById("chatAnswer");
 const dropzone = document.getElementById("dropzone");
 const targetSizeInput = document.getElementById("targetSizeInput");
 const targetUnitSelect = document.getElementById("targetUnitSelect");
@@ -34,6 +41,7 @@ let processingTimer = null;
 let loadingProgress = 0;
 let downloadTimer = null;
 let outputUrl = null;
+let chatFile = null;
 
 const textExtensions = new Set([
   "txt",
@@ -70,6 +78,12 @@ const officeExtensions = new Set([
 
 function setStatus(message) {
   statusEl.textContent = message;
+}
+
+function setChatStatus(message) {
+  if (chatStatus) {
+    chatStatus.textContent = message;
+  }
 }
 
 function getExt(filename) {
@@ -354,6 +368,19 @@ function setSelectedFile(file) {
   setSelectedFiles(file ? [file] : []);
 }
 
+function setChatSelectedFile(file) {
+  chatFile = file || null;
+  if (!chatFile) {
+    chatFileInfo.textContent = "Drop a PDF here or click to upload (one PDF).";
+    chatSendBtn.disabled = true;
+    setChatStatus("Waiting for a PDF...");
+    return;
+  }
+  chatFileInfo.textContent = `Chat PDF: ${chatFile.name}`;
+  chatSendBtn.disabled = false;
+  setChatStatus("Ready to ask a question.");
+}
+
 async function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -481,7 +508,7 @@ function saveOutputBlob(blob, downloadName, finalLabel) {
     clearInterval(downloadTimer);
     downloadTimer = null;
   }
-  startDownloadCountdown(downloadLink, finalLabel);
+startDownloadCountdown(downloadLink, finalLabel);
 
   const isPdfOutput =
     (blob.type && blob.type.includes("pdf")) || /\.pdf$/i.test(downloadName);
@@ -939,6 +966,76 @@ previewBtn?.addEventListener("click", () => {
 previewCloseBtn?.addEventListener("click", () => {
   previewWrap.classList.add("hidden");
   previewFrame.removeAttribute("src");
+});
+
+chatFileInput?.addEventListener("change", (event) => {
+  const file = event.target.files?.[0];
+  setChatSelectedFile(file);
+});
+
+["dragenter", "dragover"].forEach((eventName) => {
+  chatDropzone?.addEventListener(eventName, (event) => {
+    event.preventDefault();
+    chatDropzone.classList.add("dragover");
+  });
+});
+
+["dragleave", "drop"].forEach((eventName) => {
+  chatDropzone?.addEventListener(eventName, (event) => {
+    event.preventDefault();
+    chatDropzone.classList.remove("dragover");
+  });
+});
+
+chatDropzone?.addEventListener("drop", (event) => {
+  const files = Array.from(event.dataTransfer?.files || []);
+  const file = files.find((f) => f.type === "application/pdf");
+  if (file) {
+    chatFileInput.files = event.dataTransfer.files;
+  }
+  setChatSelectedFile(file || null);
+});
+
+chatSendBtn?.addEventListener("click", async () => {
+  if (!chatFile) {
+    setChatStatus("Upload a PDF first.");
+    return;
+  }
+  const question = String(chatQuestion?.value || "").trim();
+  if (!question) {
+    setChatStatus("Enter a question to ask.");
+    return;
+  }
+
+  try {
+    chatSendBtn.disabled = true;
+    setChatStatus("Uploading and asking...");
+    chatAnswer?.classList.add("hidden");
+    if (chatAnswer) chatAnswer.textContent = "";
+
+    const formData = new FormData();
+    formData.append("file", chatFile);
+    formData.append("question", question);
+
+    const response = await fetch("/api/chat-pdf", {
+      method: "POST",
+      body: formData,
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Chat failed.");
+    }
+    const data = await response.json();
+    if (chatAnswer) {
+      chatAnswer.textContent = data.answer || "No answer available.";
+      chatAnswer.classList.remove("hidden");
+    }
+    setChatStatus("Answer ready.");
+  } catch (error) {
+    setChatStatus(error.message);
+  } finally {
+    chatSendBtn.disabled = false;
+  }
 });
 
 ["dragenter", "dragover"].forEach((eventName) => {

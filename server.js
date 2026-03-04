@@ -4,9 +4,12 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs/promises");
 const { spawn } = require("child_process");
+const OpenAI = require("openai");
+const pdfParse = require("pdf-parse");
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+const openaiClient = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 const PROGRESS_TTL_MS = 2 * 60 * 1000;
 const progressStore = new Map();
 
@@ -55,6 +58,39 @@ app.get("/api/progress/:id", (req, res) => {
   }
   return res.json(state);
 });
+
+async function chatPdfAnswer(buffer, question) {
+  if (!openaiClient) {
+    throw new Error("OPENAI_API_KEY is not set on the server.");
+  }
+  const data = await pdfParse(buffer);
+  const text = (data.text || "").replace(/\s+/g, " ").trim();
+  if (!text) {
+    throw new Error("Could not read text from PDF. Please try another file.");
+  }
+  const maxChars = 15000;
+  const content = text.slice(0, maxChars);
+
+  const completion = await openaiClient.chat.completions.create({
+    model: "gpt-3.5-turbo",
+    messages: [
+      {
+        role: "system",
+        content:
+          "You are an assistant that answers questions about the provided PDF content. Be concise and factual.",
+      },
+      {
+        role: "user",
+        content: `PDF excerpt (may be truncated):\n${content}\n\nQuestion: ${question}`,
+      },
+    ],
+    temperature: 0.2,
+    max_tokens: 400,
+  });
+
+  const answer = completion.choices?.[0]?.message?.content?.trim() || "No answer available.";
+  return answer;
+}
 
 function sanitizeFilename(name) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -571,6 +607,24 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
     return res.send(req.file.buffer);
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+app.post("/api/chat-pdf", upload.single("file"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No PDF uploaded." });
+  }
+  const question = String(req.body.question || "").trim();
+  if (!question) {
+    return res.status(400).json({ error: "Question is required." });
+  }
+  try {
+    const answer = await chatPdfAnswer(req.file.buffer, question);
+    return res.json({ answer });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ error: error.message || "Chat failed. Check API key and try again." });
   }
 });
 

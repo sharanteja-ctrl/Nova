@@ -955,3 +955,57 @@ button.convert[disabled]::before {
     max-height: 130px;
   }
 }
+
+.question-label {
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+#chatQuestion {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--soft-border);
+  background: var(--field-bg);
+  color: var(--text);
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.chat-actions {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-answer {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--soft-border);
+  background: rgba(255, 255, 255, 0.05);
+  text-align: left;
+  line-height: 1.5;
+}
+
+.chat-card .upload-box {
+  margin-top: 10px;
+}
+
+.inline-status {
+  opacity: 0.8;
+  font-size: 0.9rem;
+}
+
+.chat-card {
+  margin-top: 22px;
+}
+
+@media (max-width: 540px) {
+  .chat-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

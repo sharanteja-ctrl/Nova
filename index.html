@@ -15,7 +15,7 @@
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260304-09" />
+    <link rel="stylesheet" href="styles.css?v=20260304-10" />
   </head>
   <body>
     <video class="bg-video" autoplay muted loop playsinline>
@@ -110,12 +110,32 @@
         <p id="status" class="status" aria-live="polite">Choose a document to start.</p>
       </div>
 
+      <div class="card chat-card">
+        <h2>AI PDF Chat</h2>
+        <p class="subtitle">Ask questions about your PDF before you download.</p>
+
+        <label class="upload-box" id="chatDropzone" for="chatFileInput">
+          <input id="chatFileInput" type="file" accept="application/pdf" />
+          <p id="chatFileInfo">Drop a PDF here or click to upload (one PDF).</p>
+        </label>
+
+        <label class="question-label" for="chatQuestion">Ask a question</label>
+        <textarea id="chatQuestion" rows="3" placeholder="e.g., Summarize chapter 2..."></textarea>
+
+        <div class="chat-actions">
+          <button id="chatSendBtn" class="convert" disabled>Ask AI</button>
+          <span id="chatStatus" class="status inline-status">Waiting for a PDF...</span>
+        </div>
+
+        <div id="chatAnswer" class="chat-answer hidden"></div>
+      </div>
+
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="app.js?v=20260304-09"></script>
+    <script src="app.js?v=20260304-10"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {
