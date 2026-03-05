@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Generative Flower Background</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #05050a;
+        font-family: "Poppins", "Segoe UI", sans-serif;
+      }
+
+      canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .overlay {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        padding: 14px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.28);
+        backdrop-filter: blur(5px);
+        color: rgba(255, 255, 255, 0.85);
+        font-size: clamp(12px, 2vw, 15px);
+        letter-spacing: 0.02em;
+        pointer-events: none;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="bg"></canvas>
+    <div class="overlay">Move pointer • Click / Tap to spawn flowers</div>
+
+    <script>
+      (() => {
+        const canvas = document.getElementById("bg");
+        const ctx = canvas.getContext("2d");
+
+        let width = 0;
+        let height = 0;
+        let dpr = 1;
+        let lastTime = performance.now();
+        let spawnTimer = 0;
+
+        const flowers = [];
+        const stars = [];
+        const pointer = {
+          x: 0,
+          y: 0,
+          targetX: 0,
+          targetY: 0,
+          active: false,
+        };
+
+        const palette = [
+          [255, 90, 190], // pink
+          [170, 110, 255], // purple
+          [90, 170, 255], // blue
+          [90, 240, 255], // cyan
+        ];
+
+        let maxFlowers = 30;
+        let baseSpawnInterval = 0.62;
+        let lineSegments = 150;
+
+        function rand(min, max) {
+          return min + Math.random() * (max - min);
+        }
+
+        function clamp(value, min, max) {
+          return Math.max(min, Math.min(max, value));
+        }
+
+        function easeOutExpo(t) {
+          return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
+        }
+
+        function initStars() {
+          stars.length = 0;
+          const count = width < 760 ? 80 : 140;
+          for (let i = 0; i < count; i += 1) {
+            stars.push({
+              x: Math.random() * width,
+              y: Math.random() * height,
+              z: rand(0.2, 1),
+              twinkle: Math.random() * Math.PI * 2,
+              speed: rand(0.05, 0.18),
+            });
+          }
+        }
+
+        function resize() {
+          dpr = Math.min(window.devicePixelRatio || 1, 2);
+          width = window.innerWidth;
+          height = window.innerHeight;
+          canvas.width = Math.floor(width * dpr);
+          canvas.height = Math.floor(height * dpr);
+          canvas.style.width = `${width}px`;
+          canvas.style.height = `${height}px`;
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          maxFlowers = width < 760 ? 18 : 30;
+          baseSpawnInterval = width < 760 ? 0.9 : 0.62;
+          lineSegments = width < 760 ? 100 : 150;
+          initStars();
+        }
+
+        class Flower {
+          constructor(x, y, force = 1) {
+            this.x = x;
+            this.y = y;
+            this.vx = rand(-0.18, 0.18) * force;
+            this.vy = rand(-0.12, 0.12) * force;
+            this.radius = rand(45, 110) * (width < 760 ? 0.82 : 1);
+            this.inner = rand(0.32, 0.58);
+            this.petalCount = Math.floor(rand(5, 11));
+            this.ripple = rand(0.08, 0.25);
+            this.rotation = rand(0, Math.PI * 2);
+            this.rotationSpeed = rand(-0.22, 0.22);
+            this.phase = rand(0, Math.PI * 2);
+            this.phaseSpeed = rand(0.18, 0.46);
+            this.depth = rand(0.45, 1.2);
+            this.life = 0;
+            this.maxLife = rand(9.5, 18.5);
+            this.seed = rand(0, 1000);
+            this.color = palette[Math.floor(Math.random() * palette.length)];
+            this.core = rand(0.12, 0.24);
+          }
+
+          update(dt, t) {
+            const influence = 170;
+            const dx = this.x - pointer.x;
+            const dy = this.y - pointer.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            if (pointer.active && dist < influence) {
+              const push = ((influence - dist) / influence) * 42 * dt;
+              this.x += (dx / dist) * push;
+              this.y += (dy / dist) * push;
+            }
+
+            this.x += this.vx * 60 * dt;
+            this.y += this.vy * 60 * dt;
+
+            // Subtle drift and breathing from trig motion
+            this.x += Math.sin(t * 0.4 + this.seed) * 0.05;
+            this.y += Math.cos(t * 0.38 + this.seed * 0.7) * 0.05;
+
+            this.rotation += this.rotationSpeed * dt;
+            this.phase += this.phaseSpeed * dt;
+            this.life += dt;
+          }
+
+          get dead() {
+            return this.life > this.maxLife;
+          }
+
+          draw(t) {
+            const p = clamp(this.life / this.maxLife, 0, 1);
+            const grow = easeOutExpo(clamp(p * 1.25, 0, 1));
+            const fade = p < 0.76 ? 1 : 1 - (p - 0.76) / 0.24;
+            const alpha = clamp(fade, 0, 1);
+            if (alpha <= 0) return;
+
+            const parallaxX = (pointer.x - width * 0.5) * 0.015 * this.depth;
+            const parallaxY = (pointer.y - height * 0.5) * 0.015 * this.depth;
+            const cx = this.x + parallaxX;
+            const cy = this.y + parallaxY;
+            const r = this.radius * grow;
+            const [cr, cg, cb] = this.color;
+
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(this.rotation);
+            ctx.globalCompositeOperation = "lighter";
+            ctx.shadowBlur = 20 + 14 * (1 - p);
+            ctx.shadowColor = `rgba(${cr}, ${cg}, ${cb}, ${0.35 * alpha})`;
+
+            const rings = 3;
+            for (let ring = 0; ring < rings; ring += 1) {
+              const ringScale = 1 + ring * 0.13;
+              const ringAlpha = (0.42 - ring * 0.1) * alpha;
+              ctx.beginPath();
+              for (let i = 0; i <= lineSegments; i += 1) {
+                const a = (i / lineSegments) * Math.PI * 2;
+                const petal = Math.sin(a * this.petalCount + this.phase);
+                const petal2 = Math.cos(a * (this.petalCount * 0.5) - this.phase * 1.2);
+                const wave = Math.sin(a * 3 + t * 0.7 + this.seed * 0.1);
+                const fr = r * ringScale * (this.inner + 0.37 * petal + this.ripple * petal2 + 0.05 * wave);
+                const px = Math.cos(a) * fr;
+                const py = Math.sin(a) * fr;
+                if (i === 0) {
+                  ctx.moveTo(px, py);
+                } else {
+                  ctx.lineTo(px, py);
+                }
+              }
+              ctx.closePath();
+              ctx.lineWidth = ring === 0 ? 1.2 : 0.9;
+              ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${ringAlpha})`;
+              ctx.stroke();
+            }
+
+            // Particle petals
+            const dots = this.petalCount * 16;
+            for (let i = 0; i < dots; i += 1) {
+              const a = (i / dots) * Math.PI * 2 + t * 0.07;
+              const pr =
+                r *
+                (this.core +
+                  0.46 * Math.abs(Math.sin(this.petalCount * a + this.phase)) +
+                  0.08 * Math.sin(t * 0.9 + i));
+              const px = Math.cos(a) * pr;
+              const py = Math.sin(a) * pr;
+              const size = 1.2 + 1.1 * (1 - p);
+              ctx.fillStyle = `rgba(255,255,255,${0.12 * alpha})`;
+              ctx.beginPath();
+              ctx.arc(px, py, size, 0, Math.PI * 2);
+              ctx.fill();
+            }
+
+            ctx.restore();
+          }
+        }
+
+        function spawnFlower(x = Math.random() * width, y = Math.random() * height, force = 1) {
+          if (flowers.length >= maxFlowers) {
+            flowers.shift();
+          }
+          flowers.push(new Flower(x, y, force));
+        }
+
+        function drawBackgroundGradient() {
+          const g = ctx.createLinearGradient(0, 0, 0, height);
+          g.addColorStop(0, "#030308");
+          g.addColorStop(0.45, "#07070d");
+          g.addColorStop(1, "#000000");
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, width, height);
+        }
+
+        function drawStars(t) {
+          ctx.save();
+          ctx.globalCompositeOperation = "lighter";
+          for (const s of stars) {
+            s.twinkle += s.speed * 0.015;
+            const pulse = 0.35 + 0.65 * Math.sin(t * s.speed + s.twinkle);
+            const alpha = (0.08 + pulse * 0.2) * s.z;
+            const parallaxX = (pointer.x - width * 0.5) * 0.006 * s.z;
+            const parallaxY = (pointer.y - height * 0.5) * 0.006 * s.z;
+            ctx.fillStyle = `rgba(190,220,255,${alpha})`;
+            ctx.beginPath();
+            ctx.arc(s.x + parallaxX, s.y + parallaxY, 0.7 + s.z * 1.1, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+
+        function updatePointerSmoothing() {
+          pointer.x += (pointer.targetX - pointer.x) * 0.16;
+          pointer.y += (pointer.targetY - pointer.y) * 0.16;
+        }
+
+        function animate(now) {
+          const dt = Math.min(0.033, (now - lastTime) / 1000);
+          lastTime = now;
+          const t = now * 0.001;
+
+          updatePointerSmoothing();
+          drawBackgroundGradient();
+          drawStars(t);
+
+          spawnTimer += dt;
+          if (spawnTimer > baseSpawnInterval) {
+            spawnTimer = 0;
+            spawnFlower();
+          }
+
+          for (let i = flowers.length - 1; i >= 0; i -= 1) {
+            const f = flowers[i];
+            f.update(dt, t);
+            f.draw(t);
+            if (f.dead) {
+              flowers.splice(i, 1);
+            }
+          }
+
+          requestAnimationFrame(animate);
+        }
+
+        function handleMove(x, y) {
+          pointer.targetX = x;
+          pointer.targetY = y;
+          pointer.active = true;
+        }
+
+        window.addEventListener("mousemove", (e) => handleMove(e.clientX, e.clientY), {
+          passive: true,
+        });
+
+        window.addEventListener(
+          "touchmove",
+          (e) => {
+            if (!e.touches.length) return;
+            const touch = e.touches[0];
+            handleMove(touch.clientX, touch.clientY);
+          },
+          { passive: true }
+        );
+
+        window.addEventListener("mouseleave", () => {
+          pointer.active = false;
+          pointer.targetX = width * 0.5;
+          pointer.targetY = height * 0.5;
+        });
+
+        window.addEventListener("click", (e) => {
+          for (let i = 0; i < 3; i += 1) {
+            spawnFlower(e.clientX + rand(-40, 40), e.clientY + rand(-40, 40), 1.45);
+          }
+        });
+
+        window.addEventListener("touchstart", (e) => {
+          if (!e.touches.length) return;
+          const touch = e.touches[0];
+          for (let i = 0; i < 2; i += 1) {
+            spawnFlower(touch.clientX + rand(-25, 25), touch.clientY + rand(-25, 25), 1.3);
+          }
+        });
+
+        window.addEventListener("resize", resize);
+
+        resize();
+        pointer.x = width * 0.5;
+        pointer.y = height * 0.5;
+        pointer.targetX = pointer.x;
+        pointer.targetY = pointer.y;
+
+        for (let i = 0; i < Math.min(10, maxFlowers); i += 1) {
+          spawnFlower(rand(width * 0.12, width * 0.88), rand(height * 0.15, height * 0.85), 0.7);
+        }
+
+        requestAnimationFrame(animate);
+      })();
+    </script>
+  </body>
+</html>

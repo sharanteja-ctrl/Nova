@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nova Converter - AI PDF Chat</title>
+    <meta
+      name="description"
+      content="Upload a PDF and chat with AI to summarize, extract key points, and answer questions from your document."
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css?v=20260304-42" />
+  </head>
+  <body class="pdf-chat-page">
+    <div class="rain-scene" aria-hidden="true">
+      <div class="city-blur"></div>
+      <div class="mist-overlay"></div>
+      <canvas id="rainCanvas" class="rain-canvas"></canvas>
+      <div class="lens-bloom"></div>
+      <div class="glass-noise"></div>
+      <div class="film-bars"></div>
+    </div>
+
+    <button id="sideToggleBtn" class="side-toggle-btn" type="button" aria-label="Open menu">
+      <span class="menu-line"></span>
+      <span class="menu-line"></span>
+      <span class="menu-dot"></span>
+    </button>
+
+    <aside id="sideMenu" class="side-menu" aria-label="Main menu">
+      <div class="side-menu-head">
+        <a class="side-logo" href="/" aria-label="Go to Nova Converter home">
+          <span class="side-logo-orb" aria-hidden="true"></span>
+          <span class="side-logo-word">
+            <strong>Nova</strong>
+            <em>Converter</em>
+          </span>
+        </a>
+        <button id="sideCloseBtn" class="side-close-btn" type="button" aria-label="Close menu">
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+      <nav class="side-nav">
+        <a class="side-link" href="/split.html">
+          <span class="side-link-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <path d="M8 3h8l5 5v12a1 1 0 0 1-1 1h-4v-2h3V9h-4a1 1 0 0 1-1-1V4H8v5H6V4a1 1 0 0 1 1-1Z"></path>
+              <path d="M3 12h9v2H3zM3 16h6v2H3zM14 15l4 4m0-4-4 4" stroke-linecap="round"></path>
+            </svg>
+          </span>
+          <span class="side-link-text">Split PDF</span>
+          <span class="side-link-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a class="side-link active" href="/pdf-chat.html">
+          <span class="side-link-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H8l-4 3V6a1 1 0 0 1 1-1Z"></path>
+              <path d="M8 9h8M8 13h6" stroke-linecap="round"></path>
+            </svg>
+          </span>
+          <span class="side-link-text">AI PDF Chat</span>
+          <span class="side-link-arrow" aria-hidden="true">↗</span>
+        </a>
+      </nav>
+      <div class="side-foot">Nova Converter</div>
+    </aside>
+
+    <div id="sideBackdrop" class="side-backdrop"></div>
+
+    <div class="container pdf-chat-container">
+      <div class="topbar">
+        <a class="brand-link" href="/" aria-label="Go to Nova Converter home">
+          <span class="brand-icon" aria-hidden="true">N</span>
+          <span class="brand-word">
+            <strong>Nova</strong>
+            <em>Converter</em>
+          </span>
+        </a>
+      </div>
+
+      <section class="hero pdf-chat-hero">
+        <h1>AI PDF Chat</h1>
+        <p class="subtitle">
+          Upload a PDF and ask questions. Answers stay grounded in your document.
+        </p>
+      </section>
+
+      <div class="card pdf-chat-shell">
+        <section class="pdf-chat-left">
+          <label id="chatDropzone" class="upload-box chat-upload-box" for="chatFileInput">
+            <input id="chatFileInput" type="file" accept=".pdf,application/pdf" />
+            <div class="split-upload-icon" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <p id="chatUploadInfo">Drop PDF here or click to upload</p>
+            <p class="tick-hint">File limit: 50MB</p>
+          </label>
+
+          <div id="chatUploadProgressWrap" class="chat-upload-progress hidden">
+            <div class="chat-progress-meta">
+              <span id="chatProgressLabel">Processing PDF...</span>
+              <span id="chatProgressPercent">0%</span>
+            </div>
+            <div class="chat-progress-track">
+              <div id="chatProgressBar" class="chat-progress-bar"></div>
+            </div>
+          </div>
+
+          <div class="chat-file-meta">
+            <div><span>File:</span> <strong id="chatFileName">-</strong></div>
+            <div><span>Pages:</span> <strong id="chatPageCount">-</strong></div>
+          </div>
+
+          <div id="chatPreviewControls" class="chat-preview-controls hidden">
+            <button id="chatPrevPageBtn" class="download split-small-btn" type="button">Prev</button>
+            <span id="chatPageIndicator">Page 1 / 1</span>
+            <button id="chatNextPageBtn" class="download split-small-btn" type="button">Next</button>
+          </div>
+
+          <div id="chatPreviewWrap" class="pdf-preview-wrap">
+            <canvas id="chatPdfCanvas"></canvas>
+            <div id="chatPdfTextLayer" class="pdf-text-layer"></div>
+          </div>
+        </section>
+
+        <section class="pdf-chat-right">
+          <div class="chat-panel-head">
+            <h2>Document Assistant</h2>
+            <div class="chat-panel-actions">
+              <button id="chatSummaryBtn" class="download split-small-btn" type="button">Download Summary</button>
+              <button id="chatClearBtn" class="download split-small-btn" type="button">Clear Chat</button>
+            </div>
+          </div>
+
+          <div id="chatMessages" class="chat-messages" aria-live="polite">
+            <div class="chat-bubble chat-bubble-ai">
+              Upload a PDF to begin. You can ask:
+              "Summarize this document", "Explain page 3", or "Extract important dates".
+            </div>
+          </div>
+
+          <div id="chatTyping" class="chat-typing hidden">
+            <span></span>
+            <span></span>
+            <span></span>
+            <em>AI is typing...</em>
+          </div>
+
+          <form id="chatForm" class="chat-form">
+            <textarea
+              id="chatInput"
+              placeholder="Ask a question about the uploaded PDF..."
+              rows="3"
+              maxlength="2000"
+            ></textarea>
+            <button id="chatSendBtn" class="convert" type="submit">Ask AI</button>
+          </form>
+
+          <p id="chatStatus" class="status">Upload a PDF to start chatting.</p>
+        </section>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <script src="rain-bg.js?v=20260304-36"></script>
+    <script src="menu.js?v=20260304-42"></script>
+    <script src="chat.js?v=20260304-42"></script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/service-worker.js")
+            .then((registration) => {
+              registration.update();
+            })
+            .catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>
