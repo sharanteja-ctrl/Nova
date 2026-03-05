@@ -21,6 +21,7 @@ It supports browser-side conversion for text/images and server-side conversion f
 - Cinematic progress bar with live server progress polling and preview-before-download option
 - PWA ready: installable across desktop and mobile
 - Download generated PDF instantly
+- Interactive Knowledge Map + AI Chat for PDFs (`/pdf-chat.html`)
 
 ## Run
 
@@ -43,6 +44,7 @@ Make sure `gs` and `soffice` are available in your terminal PATH.
 ### 3) Start server
 
 ```bash
+export OPENAI_API_KEY=your_openai_api_key
 npm start
 ```
 
@@ -68,6 +70,7 @@ Steps:
 2. In Render, create a new **Blueprint** service from that GitHub repo.
 3. Render reads `render.yaml` and deploys automatically.
 4. Use the Render URL as your public site.
+5. In Render service environment, set `OPENAI_API_KEY` (required for AI chat answers and AI knowledge-map generation), then redeploy.
 
 ## Note
 
