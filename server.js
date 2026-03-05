@@ -5,7 +5,9 @@ const os = require("os");
 const fs = require("fs/promises");
 const crypto = require("crypto");
 const { spawn } = require("child_process");
-const pdfParse = require("pdf-parse");
+const pdfParseModule = require("pdf-parse");
+const PDFParseClass = pdfParseModule && pdfParseModule.PDFParse ? pdfParseModule.PDFParse : null;
+const legacyPdfParse = typeof pdfParseModule === "function" ? pdfParseModule : null;
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -663,6 +665,43 @@ function pickTopChunks(doc, question, questionEmbedding, topK = 6) {
 }
 
 async function extractPdfPages(buffer) {
+  if (PDFParseClass) {
+    const parser = new PDFParseClass({ data: buffer });
+    try {
+      const parsed = await parser.getText();
+      const pageCount = Number(parsed?.total || 0);
+      const rawPages = Array.isArray(parsed?.pages) ? parsed.pages : [];
+
+      let pages = rawPages.map((entry, index) => ({
+        page: Number(entry?.num || index + 1),
+        text: normalizeSpaces(entry?.text || ""),
+      }));
+
+      if (!pages.some((entry) => entry.text.length > 0)) {
+        const fullText = normalizeSpaces(parsed?.text || "");
+        if (fullText) {
+          const splitCount = Math.max(1, pageCount || rawPages.length || 1);
+          const sliceSize = Math.max(1, Math.ceil(fullText.length / splitCount));
+          pages = Array.from({ length: splitCount }, (_, index) => ({
+            page: index + 1,
+            text: normalizeSpaces(fullText.slice(index * sliceSize, (index + 1) * sliceSize)),
+          }));
+        }
+      }
+
+      return {
+        pageCount: Math.max(pageCount, pages.length),
+        pages,
+      };
+    } finally {
+      await parser.destroy().catch(() => {});
+    }
+  }
+
+  if (!legacyPdfParse) {
+    throw new Error("pdf-parse parser is unavailable on this server.");
+  }
+
   const pages = [];
   let pageIndex = 0;
   const parseOptions = {
@@ -681,7 +720,7 @@ async function extractPdfPages(buffer) {
     },
   };
 
-  const parsed = await pdfParse(buffer, parseOptions);
+  const parsed = await legacyPdfParse(buffer, parseOptions);
   return {
     pageCount: Number(parsed?.numpages || pages.length || 0),
     pages,
