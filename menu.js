@@ -26,6 +26,17 @@
       active = currentPath === "/" || currentPath === "/index.html";
     } else if (target === "/split" || target === "/split.html") {
       active = currentPath === "/split" || currentPath === "/split.html";
+    } else if (
+      target === "/pdf-chat" ||
+      target === "/pdf-chat.html" ||
+      target === "/knowledge-map-chat" ||
+      target === "/knowledge-map-chat.html"
+    ) {
+      active =
+        currentPath === "/pdf-chat" ||
+        currentPath === "/pdf-chat.html" ||
+        currentPath === "/knowledge-map-chat" ||
+        currentPath === "/knowledge-map-chat.html";
     } else {
       active = currentPath === target;
     }
@@ -35,6 +46,10 @@
 
   function openMenu() {
     sideMenu.classList.add("open");
+    sideMenu.setAttribute("aria-hidden", "false");
+    if (sideToggleBtn) {
+      sideToggleBtn.setAttribute("aria-expanded", "true");
+    }
     if (sideBackdrop) {
       sideBackdrop.classList.add("show");
     }
@@ -43,6 +58,10 @@
 
   function closeMenu() {
     sideMenu.classList.remove("open");
+    sideMenu.setAttribute("aria-hidden", "true");
+    if (sideToggleBtn) {
+      sideToggleBtn.setAttribute("aria-expanded", "false");
+    }
     if (sideBackdrop) {
       sideBackdrop.classList.remove("show");
     }

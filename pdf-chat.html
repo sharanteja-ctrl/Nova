@@ -3,18 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nova Converter - AI PDF Chat</title>
+    <title>Nova Converter - Interactive Knowledge Map + AI Chat</title>
     <meta
       name="description"
-      content="Upload a PDF and chat with AI to summarize, extract key points, and answer questions from your document."
+      content="Upload a PDF to generate an interactive knowledge map and ask AI questions grounded in the document."
     />
     <link
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=20260304-42" />
+    <link rel="stylesheet" href="styles.css?v=20260305-48" />
   </head>
   <body class="pdf-chat-page">
+    <a class="skip-link" href="#mainContent">Skip to main content</a>
     <div class="rain-scene" aria-hidden="true">
       <div class="city-blur"></div>
       <div class="mist-overlay"></div>
@@ -24,15 +25,22 @@
       <div class="film-bars"></div>
     </div>
 
-    <button id="sideToggleBtn" class="side-toggle-btn" type="button" aria-label="Open menu">
+    <button
+      id="sideToggleBtn"
+      class="side-toggle-btn"
+      type="button"
+      aria-label="Open menu"
+      aria-controls="sideMenu"
+      aria-expanded="false"
+    >
       <span class="menu-line"></span>
       <span class="menu-line"></span>
       <span class="menu-dot"></span>
     </button>
 
-    <aside id="sideMenu" class="side-menu" aria-label="Main menu">
+    <aside id="sideMenu" class="side-menu" aria-label="Main menu" aria-hidden="true">
       <div class="side-menu-head">
-        <a class="side-logo" href="/" aria-label="Go to Nova Converter home">
+        <a class="side-logo" href="/index.html" aria-label="Go to Nova Converter home">
           <span class="side-logo-orb" aria-hidden="true"></span>
           <span class="side-logo-word">
             <strong>Nova</strong>
@@ -62,7 +70,7 @@
               <path d="M8 9h8M8 13h6" stroke-linecap="round"></path>
             </svg>
           </span>
-          <span class="side-link-text">AI PDF Chat</span>
+          <span class="side-link-text">Interactive Knowledge Map + AI Chat</span>
           <span class="side-link-arrow" aria-hidden="true">↗</span>
         </a>
       </nav>
@@ -71,9 +79,9 @@
 
     <div id="sideBackdrop" class="side-backdrop"></div>
 
-    <div class="container pdf-chat-container">
+    <main id="mainContent" class="container pdf-chat-container">
       <div class="topbar">
-        <a class="brand-link" href="/" aria-label="Go to Nova Converter home">
+        <a class="brand-link" href="/index.html" aria-label="Go to Nova Converter home">
           <span class="brand-icon" aria-hidden="true">N</span>
           <span class="brand-word">
             <strong>Nova</strong>
@@ -83,14 +91,14 @@
       </div>
 
       <section class="hero pdf-chat-hero">
-        <h1>AI PDF Chat</h1>
+        <h1>Interactive Knowledge Map + AI Chat</h1>
         <p class="subtitle">
-          Upload a PDF and ask questions. Answers stay grounded in your document.
+          Upload a PDF, explore concepts visually, and ask grounded AI questions.
         </p>
       </section>
 
       <div class="card pdf-chat-shell">
-        <section class="pdf-chat-left">
+        <section class="pdf-chat-left" aria-labelledby="pdfUploadTitle">
           <label id="chatDropzone" class="upload-box chat-upload-box" for="chatFileInput">
             <input id="chatFileInput" type="file" accept=".pdf,application/pdf" />
             <div class="split-upload-icon" aria-hidden="true">
@@ -117,6 +125,34 @@
             <div><span>Pages:</span> <strong id="chatPageCount">-</strong></div>
           </div>
 
+          <section class="knowledge-map-panel" aria-labelledby="pdfUploadTitle">
+            <div class="knowledge-map-head">
+              <h3 id="pdfUploadTitle">Knowledge Map</h3>
+              <button
+                id="mapRefreshBtn"
+                class="download split-small-btn"
+                type="button"
+                aria-label="Regenerate knowledge map"
+              >
+                Regenerate
+              </button>
+            </div>
+            <p id="mapStatus" class="map-status" aria-live="polite">
+              Upload a PDF to generate topic map.
+            </p>
+            <div
+              id="knowledgeMapCanvas"
+              class="knowledge-map-canvas"
+              role="img"
+              aria-label="Interactive knowledge map graph"
+            ></div>
+            <div id="knowledgeNodeInfo" class="knowledge-node-info">
+              <p class="node-empty">
+                Click a node to view explanation, jump to source page, and expand related subtopics.
+              </p>
+            </div>
+          </section>
+
           <div id="chatPreviewControls" class="chat-preview-controls hidden">
             <button id="chatPrevPageBtn" class="download split-small-btn" type="button">Prev</button>
             <span id="chatPageIndicator">Page 1 / 1</span>
@@ -129,16 +165,16 @@
           </div>
         </section>
 
-        <section class="pdf-chat-right">
+        <section class="pdf-chat-right" aria-labelledby="chatPanelTitle">
           <div class="chat-panel-head">
-            <h2>Document Assistant</h2>
+            <h2 id="chatPanelTitle">AI Chat Assistant</h2>
             <div class="chat-panel-actions">
               <button id="chatSummaryBtn" class="download split-small-btn" type="button">Download Summary</button>
               <button id="chatClearBtn" class="download split-small-btn" type="button">Clear Chat</button>
             </div>
           </div>
 
-          <div id="chatMessages" class="chat-messages" aria-live="polite">
+          <div id="chatMessages" class="chat-messages" aria-live="polite" aria-relevant="additions">
             <div class="chat-bubble chat-bubble-ai">
               Upload a PDF to begin. You can ask:
               "Summarize this document", "Explain page 3", or "Extract important dates".
@@ -152,25 +188,49 @@
             <em>AI is typing...</em>
           </div>
 
+          <div class="chat-quick-prompts" aria-label="Quick prompts">
+            <button type="button" class="chat-quick-chip" data-prompt="Summarize this document">
+              Summarize
+            </button>
+            <button type="button" class="chat-quick-chip" data-prompt="Explain chapter 2 simply">
+              Explain chapter 2
+            </button>
+            <button type="button" class="chat-quick-chip" data-prompt="What are the key points?">
+              Key points
+            </button>
+            <button
+              type="button"
+              class="chat-quick-chip"
+              data-prompt="Extract important dates from this PDF"
+            >
+              Important dates
+            </button>
+          </div>
+
           <form id="chatForm" class="chat-form">
+            <label class="sr-only" for="chatInput">Ask a question about uploaded PDF</label>
             <textarea
               id="chatInput"
               placeholder="Ask a question about the uploaded PDF..."
               rows="3"
               maxlength="2000"
+              aria-describedby="chatStatus"
             ></textarea>
             <button id="chatSendBtn" class="convert" type="submit">Ask AI</button>
           </form>
 
-          <p id="chatStatus" class="status">Upload a PDF to start chatting.</p>
+          <p id="chatStatus" class="status" role="status" aria-live="polite">
+            Upload a PDF to start chatting.
+          </p>
         </section>
       </div>
-    </div>
+    </main>
 
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
-    <script src="rain-bg.js?v=20260304-36"></script>
-    <script src="menu.js?v=20260304-42"></script>
-    <script src="chat.js?v=20260304-42"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+    <script src="rain-bg.js?v=20260305-43"></script>
+    <script src="menu.js?v=20260305-45"></script>
+    <script src="chat.js?v=20260305-48"></script>
     <script>
       if ("serviceWorker" in navigator) {
         window.addEventListener("load", () => {

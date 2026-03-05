@@ -33,6 +33,10 @@ app.get("/pdf-chat", (req, res) => {
   res.sendFile(path.join(__dirname, "pdf-chat.html"));
 });
 
+app.get("/knowledge-map-chat", (req, res) => {
+  res.sendFile(path.join(__dirname, "pdf-chat.html"));
+});
+
 function setProgress(progressId, progress, phase, status = "processing") {
   if (!progressId) {
     return;
@@ -306,6 +310,337 @@ async function openAiAnswer({ question, contextChunks, history = [] }) {
   ).trim();
 
   return answer;
+}
+
+function safeJsonParseObject(raw) {
+  const text = String(raw || "").trim();
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function sanitizeNodeId(value, fallback) {
+  const candidate = String(value || fallback || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return candidate || fallback || `node-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+function sanitizeKnowledgeMap(candidate, pageCount, docTitle) {
+  const maxPage = Math.max(1, Number(pageCount) || 1);
+  const sourceNodes = Array.isArray(candidate?.nodes) ? candidate.nodes : [];
+  const sourceEdges = Array.isArray(candidate?.edges) ? candidate.edges : [];
+  const nodes = [];
+  const byId = new Set();
+  const allowedTypes = new Set(["document", "main", "topic", "subtopic", "concept"]);
+
+  sourceNodes.slice(0, 48).forEach((entry) => {
+    const label = normalizeSpaces(entry?.label || "").slice(0, 80);
+    if (!label) return;
+
+    let id = sanitizeNodeId(entry?.id, `node-${nodes.length + 1}`);
+    while (byId.has(id)) {
+      id = sanitizeNodeId(`${id}-${nodes.length + 1}`, `node-${nodes.length + 1}`);
+    }
+    byId.add(id);
+
+    const requestedType = normalizeSpaces(entry?.type || "").toLowerCase();
+    const type = allowedTypes.has(requestedType) ? requestedType : "topic";
+    const summary = normalizeSpaces(entry?.summary || entry?.description || "").slice(0, 280);
+    const pagesRaw = Array.isArray(entry?.pages) ? entry.pages : [entry?.page];
+    let pages = pagesRaw
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value))
+      .map((value) => Math.max(1, Math.min(maxPage, Math.round(value))));
+    pages = Array.from(new Set(pages)).slice(0, 6);
+    if (!pages.length) pages = [1];
+
+    const parentId = entry?.parentId ? sanitizeNodeId(entry.parentId, "") : "";
+    nodes.push({
+      id,
+      label,
+      type,
+      summary,
+      pages,
+      ...(parentId ? { parentId } : {}),
+    });
+  });
+
+  const hasDocumentNode = nodes.some((node) => node.type === "document");
+  if (!hasDocumentNode) {
+    const rootId = "document-root";
+    if (!byId.has(rootId)) {
+      byId.add(rootId);
+      nodes.unshift({
+        id: rootId,
+        label: normalizeSpaces(path.parse(docTitle || "Document").name || "Document"),
+        type: "document",
+        summary: `Knowledge map generated from ${maxPage} pages.`,
+        pages: [1, maxPage],
+      });
+    }
+  }
+
+  const idSet = new Set(nodes.map((node) => node.id));
+  const edges = [];
+  const edgeKeys = new Set();
+
+  sourceEdges.slice(0, 96).forEach((entry) => {
+    const source = sanitizeNodeId(entry?.source, "");
+    const target = sanitizeNodeId(entry?.target, "");
+    if (!source || !target || source === target) return;
+    if (!idSet.has(source) || !idSet.has(target)) return;
+    const key = `${source}->${target}`;
+    if (edgeKeys.has(key)) return;
+    edgeKeys.add(key);
+    edges.push({
+      source,
+      target,
+      relationship: normalizeSpaces(entry?.relationship || "related").slice(0, 72) || "related",
+    });
+  });
+
+  nodes.forEach((node) => {
+    if (!node.parentId) return;
+    if (!idSet.has(node.parentId)) return;
+    const key = `${node.parentId}->${node.id}`;
+    if (edgeKeys.has(key)) return;
+    edgeKeys.add(key);
+    edges.push({
+      source: node.parentId,
+      target: node.id,
+      relationship: "contains",
+    });
+  });
+
+  const root = nodes.find((node) => node.type === "document");
+  if (root) {
+    const topLevel = nodes.filter((node) => node.type === "main" || node.type === "topic");
+    topLevel.forEach((node) => {
+      const key = `${root.id}->${node.id}`;
+      if (edgeKeys.has(key) || node.id === root.id) return;
+      edgeKeys.add(key);
+      edges.push({
+        source: root.id,
+        target: node.id,
+        relationship: "contains",
+      });
+    });
+  }
+
+  return {
+    nodes,
+    edges,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+function buildMapSourceContext(doc, maxChunks = 40) {
+  return doc.chunks
+    .slice(0, Math.min(maxChunks, doc.chunks.length))
+    .map((chunk, index) => {
+      const pageLabel =
+        chunk.pageEnd && chunk.pageEnd !== chunk.page
+          ? `p.${chunk.page}-${chunk.pageEnd}`
+          : `p.${chunk.page}`;
+      return `[${index + 1}] ${pageLabel}\n${chunk.text.slice(0, 1000)}`;
+    })
+    .join("\n\n");
+}
+
+async function openAiKnowledgeMap(doc) {
+  ensureOpenAiApiKey();
+  const context = buildMapSourceContext(doc, 40);
+  const systemPrompt = [
+    "You build compact knowledge maps from PDF content.",
+    "Return strict JSON only.",
+    "Create nodes and edges representing topics, subtopics, and concepts.",
+    "Every node must have id, label, type, summary, and pages.",
+    "Use types: document, topic, subtopic, concept.",
+    "Include parentId on subtopic/concept nodes when possible.",
+    "Keep node labels short and practical.",
+  ].join(" ");
+
+  const userPrompt = [
+    `PDF name: ${doc.fileName}`,
+    `Pages: ${doc.pageCount}`,
+    "Build a useful interactive map for exploration.",
+    "Prefer 10-26 nodes and 10-38 edges.",
+    "Output format:",
+    '{"nodes":[{"id":"...","label":"...","type":"topic|subtopic|concept","summary":"...","pages":[1,2],"parentId":"optional"}],"edges":[{"source":"id","target":"id","relationship":"..."}]}',
+    "",
+    "PDF context:",
+    context,
+  ].join("\n");
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: makeOpenAiHeaders(),
+    body: JSON.stringify({
+      model: process.env.OPENAI_CHAT_MODEL || "gpt-4o-mini",
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    let detail = "";
+    try {
+      detail = (await response.text()).slice(0, 320);
+    } catch {
+      detail = "";
+    }
+    throw new Error(`Knowledge map generation failed (${response.status}). ${detail}`);
+  }
+
+  const json = await response.json();
+  const raw = String(json?.choices?.[0]?.message?.content || "").trim();
+  const parsed = safeJsonParseObject(raw);
+  if (!parsed) {
+    throw new Error("AI returned non-JSON output for knowledge map.");
+  }
+  return sanitizeKnowledgeMap(parsed, doc.pageCount, doc.fileName);
+}
+
+function buildFallbackKnowledgeMap(doc) {
+  const stopWords = new Set([
+    "about",
+    "after",
+    "also",
+    "because",
+    "between",
+    "could",
+    "document",
+    "their",
+    "there",
+    "these",
+    "those",
+    "which",
+    "while",
+    "where",
+    "when",
+    "with",
+    "from",
+    "into",
+    "than",
+    "then",
+    "them",
+    "this",
+    "that",
+    "have",
+    "has",
+    "will",
+    "would",
+    "should",
+    "chapter",
+    "section",
+    "pages",
+  ]);
+
+  const title = normalizeSpaces(path.parse(doc.fileName || "Document").name || "Document");
+  const frequencies = new Map();
+  const tokenPages = new Map();
+  const scopedChunks = doc.chunks.slice(0, 130);
+
+  scopedChunks.forEach((chunk) => {
+    const uniqueTokens = new Set(tokenize(chunk.text));
+    uniqueTokens.forEach((token) => {
+      if (token.length < 4 || stopWords.has(token)) return;
+      frequencies.set(token, (frequencies.get(token) || 0) + 1);
+      if (!tokenPages.has(token)) tokenPages.set(token, new Set());
+      tokenPages.get(token).add(chunk.page);
+    });
+  });
+
+  let topTopics = Array.from(frequencies.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([token]) => token);
+
+  if (!topTopics.length) {
+    topTopics = ["overview", "highlights", "summary"];
+  }
+
+  const nodes = [
+    {
+      id: "document-root",
+      label: title,
+      type: "document",
+      summary: `Interactive map derived from ${doc.pageCount} pages.`,
+      pages: [1, Math.max(1, doc.pageCount)],
+    },
+  ];
+  const edges = [];
+
+  topTopics.forEach((topic, topicIndex) => {
+    const topicId = `topic-${topicIndex + 1}`;
+    const relatedChunks = scopedChunks
+      .filter((chunk) => tokenize(chunk.text).includes(topic))
+      .slice(0, 5);
+    const topicSummary =
+      relatedChunks[0]?.text.slice(0, 220) ||
+      `This topic appears in multiple sections of the document.`;
+    const pages = Array.from(tokenPages.get(topic) || []).slice(0, 5);
+
+    nodes.push({
+      id: topicId,
+      label: topic.replace(/(^\w)|(\s+\w)/g, (match) => match.toUpperCase()),
+      type: "topic",
+      summary: topicSummary,
+      pages: pages.length ? pages : [1],
+    });
+    edges.push({
+      source: "document-root",
+      target: topicId,
+      relationship: "contains",
+    });
+
+    const conceptFreq = new Map();
+    relatedChunks.forEach((chunk) => {
+      tokenize(chunk.text).forEach((token) => {
+        if (token === topic || token.length < 4 || stopWords.has(token)) return;
+        conceptFreq.set(token, (conceptFreq.get(token) || 0) + 1);
+      });
+    });
+
+    const concepts = Array.from(conceptFreq.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([token]) => token);
+
+    concepts.forEach((concept, conceptIndex) => {
+      const conceptId = `concept-${topicIndex + 1}-${conceptIndex + 1}`;
+      nodes.push({
+        id: conceptId,
+        label: concept.replace(/(^\w)|(\s+\w)/g, (match) => match.toUpperCase()),
+        type: "concept",
+        summary: `Related concept under ${topic}.`,
+        pages: pages.length ? pages.slice(0, 3) : [1],
+        parentId: topicId,
+      });
+      edges.push({
+        source: topicId,
+        target: conceptId,
+        relationship: "related",
+      });
+    });
+  });
+
+  return sanitizeKnowledgeMap({ nodes, edges }, doc.pageCount, doc.fileName);
 }
 
 function pickTopChunks(doc, question, questionEmbedding, topK = 6) {
@@ -965,6 +1300,63 @@ app.post("/api/pdf-chat/upload", upload.single("file"), async (req, res) => {
     setProgress(progressId, 100, "Upload failed", "error");
     clearProgressLater(progressId);
     return res.status(500).json({ error: error.message || "Failed to process PDF." });
+  }
+});
+
+app.post("/api/pdf-chat/map", async (req, res) => {
+  try {
+    const docId = String(req.body?.docId || "").trim();
+    const forceRegenerate = Boolean(req.body?.forceRegenerate);
+    if (!docId) {
+      return res.status(400).json({ error: "docId is required." });
+    }
+
+    const doc = touchChatDoc(chatDocs.get(docId));
+    if (!doc) {
+      return res
+        .status(404)
+        .json({ error: "Document not found or expired. Please upload again." });
+    }
+
+    if (!forceRegenerate && doc.knowledgeMap) {
+      return res.json({
+        map: doc.knowledgeMap,
+        mode: doc.knowledgeMapMode || "cached",
+        cached: true,
+      });
+    }
+
+    let map = null;
+    let mode = "fallback";
+    let warning = null;
+
+    if (process.env.OPENAI_API_KEY) {
+      try {
+        map = await openAiKnowledgeMap(doc);
+        mode = "ai";
+      } catch (error) {
+        warning = `AI map fallback: ${error.message}`;
+      }
+    } else {
+      warning = "OPENAI_API_KEY missing; using fallback topic extraction.";
+    }
+
+    if (!map) {
+      map = buildFallbackKnowledgeMap(doc);
+    }
+
+    doc.knowledgeMap = map;
+    doc.knowledgeMapMode = mode;
+    touchChatDoc(doc);
+
+    return res.json({
+      map,
+      mode,
+      cached: false,
+      warning,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Failed to build knowledge map." });
   }
 });
 
