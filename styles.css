@@ -894,6 +894,11 @@ h1 {
   background: rgba(255, 255, 255, 0.16);
 }
 
+.scan-mini-btn.active {
+  background: rgba(80, 220, 170, 0.2);
+  border-color: rgba(110, 250, 190, 0.68);
+}
+
 .scan-mini-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
@@ -1037,6 +1042,22 @@ h1 {
   max-height: 56vh;
 }
 
+.scan-source-wrap.rotation-anim {
+  animation: rotatePulse 0.26s ease;
+}
+
+@keyframes rotatePulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.985);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 #scanSourceCanvas {
   background: #0b0d12;
 }
@@ -1095,6 +1116,18 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.scan-rotate-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scan-rotate-toolbar .scan-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .scan-filter-btn {
@@ -1184,6 +1217,7 @@ h1 {
 .camera-actions {
   margin-top: 2px;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -1848,11 +1882,19 @@ button.convert[disabled]::before {
   }
 
   .camera-panel {
-    padding: 8px;
+    padding: 10px;
+  }
+
+  .scan-live-wrap {
+    min-height: 52svh;
   }
 
   .scan-live-wrap video {
-    max-height: 240px;
+    max-height: 58svh;
+  }
+
+  .scan-hint {
+    font-size: 0.93rem;
   }
 
   .scan-toolbar {
@@ -1869,10 +1911,44 @@ button.convert[disabled]::before {
     padding-bottom: 2px;
   }
 
-  .buttons,
-  .camera-actions {
+  .scan-rotate-toolbar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+
+  .buttons {
     flex-direction: column;
     gap: 10px;
+  }
+
+  .camera-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    position: sticky;
+    bottom: 6px;
+    z-index: 6;
+    padding: 8px;
+    border-radius: 14px;
+    background: rgba(6, 11, 20, 0.84);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  #captureBtn {
+    grid-column: 1 / -1;
+    min-height: 62px;
+    border-radius: 18px;
+    font-size: 1.06rem;
+    font-weight: 700;
+    box-shadow: 0 12px 30px rgba(20, 112, 255, 0.32);
+  }
+
+  #captureBtn .btn-icon {
+    width: 22px;
+    height: 22px;
   }
 
   #previewFrame {

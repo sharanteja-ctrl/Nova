@@ -46,10 +46,17 @@ Make sure `gs` and `soffice` are available in your terminal PATH.
 ### 3) Start server
 
 ```bash
+# Optional: enable Gemini-assisted camera document detection
+export GEMINI_API_KEY=your_gemini_api_key
+# Optional model override:
+# export GEMINI_MODEL=gemini-1.5-flash
+
 npm start
 ```
 
 Then open `http://localhost:8080`.
+
+Gemini key is used only on the backend (`/api/gemini-doc-detect`) and is never exposed in frontend code.
 
 ## Install as App (Mac, iPhone, Android, Windows)
 

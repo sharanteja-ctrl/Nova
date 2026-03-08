@@ -9,6 +9,9 @@ const { spawn } = require("child_process");
 const app = express();
 const PORT = process.env.PORT || 8080;
 const PROGRESS_TTL_MS = 2 * 60 * 1000;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const GEMINI_TIMEOUT_MS = 9000;
+const GEMINI_MAX_IMAGE_BASE64_BYTES = 3 * 1024 * 1024;
 const progressStore = new Map();
 
 const upload = multer({
@@ -17,7 +20,7 @@ const upload = multer({
 });
 
 app.use(express.static(__dirname));
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "5mb" }));
 
 app.get("/split", (req, res) => {
   res.sendFile(path.join(__dirname, "split.html"));
@@ -64,6 +67,305 @@ app.get("/api/progress/:id", (req, res) => {
 
 function sanitizeFilename(name) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function parseImageDataUrl(imageDataUrl) {
+  if (typeof imageDataUrl !== "string") {
+    return null;
+  }
+  const trimmed = imageDataUrl.trim();
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([a-zA-Z0-9+/=]+)$/.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+  return { mimeType: match[1], data: match[2] };
+}
+
+function clamp01(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(1, value));
+}
+
+function orderCornersClockwise(corners) {
+  if (!Array.isArray(corners) || corners.length !== 4) {
+    return null;
+  }
+  const parsed = corners.map((entry) => ({
+    x: Number(entry?.x),
+    y: Number(entry?.y),
+  }));
+  if (parsed.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y))) {
+    return null;
+  }
+  const sums = parsed.map((point) => point.x + point.y);
+  const diffs = parsed.map((point) => point.x - point.y);
+  const tl = parsed[sums.indexOf(Math.min(...sums))];
+  const br = parsed[sums.indexOf(Math.max(...sums))];
+  const tr = parsed[diffs.indexOf(Math.max(...diffs))];
+  const bl = parsed[diffs.indexOf(Math.min(...diffs))];
+  return [tl, tr, br, bl];
+}
+
+function normalizeGeminiCorners(rawCorners) {
+  if (!rawCorners) {
+    return null;
+  }
+  let corners = null;
+  if (Array.isArray(rawCorners)) {
+    corners = rawCorners.map((entry) => {
+      if (Array.isArray(entry) && entry.length >= 2) {
+        return { x: Number(entry[0]), y: Number(entry[1]) };
+      }
+      return { x: Number(entry?.x), y: Number(entry?.y) };
+    });
+  } else if (
+    rawCorners.topLeft &&
+    rawCorners.topRight &&
+    rawCorners.bottomRight &&
+    rawCorners.bottomLeft
+  ) {
+    corners = [
+      rawCorners.topLeft,
+      rawCorners.topRight,
+      rawCorners.bottomRight,
+      rawCorners.bottomLeft,
+    ].map((entry) => ({ x: Number(entry?.x), y: Number(entry?.y) }));
+  }
+  const ordered = orderCornersClockwise(corners);
+  if (!ordered) {
+    return null;
+  }
+  return ordered.map((point) => ({
+    x: clamp01(point.x),
+    y: clamp01(point.y),
+  }));
+}
+
+function extractGeminiText(payload) {
+  if (!payload || !Array.isArray(payload.candidates)) {
+    return "";
+  }
+  const parts = payload.candidates[0]?.content?.parts;
+  if (!Array.isArray(parts)) {
+    return "";
+  }
+  return parts
+    .map((part) => (typeof part?.text === "string" ? part.text : ""))
+    .join("\n")
+    .trim();
+}
+
+function extractJsonObject(text) {
+  if (!text || typeof text !== "string") {
+    return null;
+  }
+  const fencedMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  const candidate = (fencedMatch ? fencedMatch[1] : text).trim();
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  if (start < 0 || end <= start) {
+    return null;
+  }
+  try {
+    return JSON.parse(candidate.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeGeminiDetection(raw) {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const corners = normalizeGeminiCorners(raw.corners || raw.boundingCorners || raw.points);
+  const detectedValue = raw.documentDetected ?? raw.detected ?? raw.hasDocument ?? false;
+  const confidenceValue = Number(raw.confidence ?? raw.score ?? 0);
+  return {
+    documentDetected: Boolean(detectedValue) && Boolean(corners),
+    confidence: clamp01(confidenceValue),
+    corners,
+    advice:
+      typeof raw.advice === "string"
+        ? raw.advice.trim().replace(/\s+/g, " ").slice(0, 220)
+        : "",
+  };
+}
+
+function normalizeGeminiRotation(raw) {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+  const candidates = [0, 90, -90, 180, -180];
+  const requested = Number(raw.rotation ?? raw.rotate ?? 0);
+  const nearest = candidates.reduce((best, value) =>
+    Math.abs(value - requested) < Math.abs(best - requested) ? value : best
+  , 0);
+  const confidenceValue = Number(raw.confidence ?? raw.score ?? 0.5);
+  const reasonText =
+    typeof raw.reason === "string"
+      ? raw.reason.trim().replace(/\s+/g, " ").slice(0, 180)
+      : "";
+  return {
+    rotation: nearest === -180 ? 180 : nearest,
+    confidence: clamp01(confidenceValue),
+    reason: reasonText,
+  };
+}
+
+async function callGeminiDocDetection(imagePart) {
+  const apiKey = String(process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey) {
+    const missingError = new Error("GEMINI_API_KEY is not set on the server.");
+    missingError.status = 503;
+    throw missingError;
+  }
+
+  const prompt = [
+    "Detect a single paper document in this image.",
+    "Return ONLY valid JSON with this exact schema:",
+    '{"documentDetected": boolean, "confidence": number, "corners":[{"x":number,"y":number},{"x":number,"y":number},{"x":number,"y":number},{"x":number,"y":number}], "advice": string}',
+    "Requirements:",
+    "- x,y must be normalized between 0 and 1.",
+    "- corners must be ordered: top-left, top-right, bottom-right, bottom-left.",
+    "- If document is not found, set documentDetected false and corners to null.",
+    "- Keep advice short (max 16 words).",
+  ].join("\n");
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+    GEMINI_MODEL
+  )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const payload = {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: prompt },
+          {
+            inline_data: {
+              mime_type: imagePart.mimeType,
+              data: imagePart.data,
+            },
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      topP: 0.8,
+      maxOutputTokens: 320,
+    },
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    const msg =
+      body?.error?.message ||
+      `Gemini request failed with HTTP ${response.status}.`;
+    const error = new Error(msg);
+    error.status = response.status;
+    throw error;
+  }
+
+  const rawText = extractGeminiText(body);
+  const parsed = extractJsonObject(rawText);
+  const normalized = normalizeGeminiDetection(parsed);
+  if (!normalized) {
+    throw new Error("Gemini response was not in the expected JSON format.");
+  }
+  return normalized;
+}
+
+async function callGeminiOrientation(imagePart) {
+  const apiKey = String(process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey) {
+    const missingError = new Error("GEMINI_API_KEY is not set on the server.");
+    missingError.status = 503;
+    throw missingError;
+  }
+
+  const prompt = [
+    "Analyze the text orientation in this scanned document image.",
+    "Return ONLY valid JSON with this exact schema:",
+    '{"rotation": number, "confidence": number, "reason": string}',
+    "Rules:",
+    "- rotation must be one of: 0, 90, -90, 180.",
+    "- rotation is the correction angle needed to make text upright.",
+    "- confidence must be 0..1.",
+    "- Keep reason short (max 14 words).",
+  ].join("\n");
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+    GEMINI_MODEL
+  )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const payload = {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: prompt },
+          {
+            inline_data: {
+              mime_type: imagePart.mimeType,
+              data: imagePart.data,
+            },
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      topP: 0.8,
+      maxOutputTokens: 180,
+    },
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    const msg = body?.error?.message || `Gemini request failed with HTTP ${response.status}.`;
+    const error = new Error(msg);
+    error.status = response.status;
+    throw error;
+  }
+
+  const rawText = extractGeminiText(body);
+  const parsed = extractJsonObject(rawText);
+  const normalized = normalizeGeminiRotation(parsed);
+  if (!normalized) {
+    throw new Error("Gemini response was not in the expected JSON format.");
+  }
+  return normalized;
 }
 
 async function runCommand(command, args, timeoutMs = 120000) {
@@ -577,6 +879,102 @@ app.post("/api/compress-pdf", upload.single("file"), async (req, res) => {
     return res.send(req.file.buffer);
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+app.post("/api/gemini-doc-detect", async (req, res) => {
+  const apiKey = String(process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey) {
+    return res.status(503).json({
+      error:
+        "Gemini is not configured on this server. Set GEMINI_API_KEY in environment variables.",
+    });
+  }
+
+  const imageDataUrl = req.body?.imageDataUrl;
+  const imagePart = parseImageDataUrl(imageDataUrl);
+  if (!imagePart) {
+    return res.status(400).json({
+      error:
+        "Invalid imageDataUrl. Send a base64 data URL (data:image/jpeg;base64,...)",
+    });
+  }
+  if (imagePart.data.length > GEMINI_MAX_IMAGE_BASE64_BYTES) {
+    return res.status(413).json({ error: "Image is too large for Gemini assist." });
+  }
+
+  try {
+    const detection = await callGeminiDocDetection(imagePart);
+    return res.json({
+      source: "gemini",
+      model: GEMINI_MODEL,
+      ...detection,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return res.status(504).json({ error: "Gemini request timed out." });
+    }
+    if (error?.status === 401 || error?.status === 403) {
+      return res.status(502).json({
+        error: "Gemini authentication failed. Verify GEMINI_API_KEY in the server settings.",
+      });
+    }
+    if (error?.status === 429) {
+      return res.status(429).json({
+        error: "Gemini quota/rate limit reached. Try again or check billing/quota.",
+      });
+    }
+    return res.status(502).json({
+      error: error?.message || "Gemini document detection failed.",
+    });
+  }
+});
+
+app.post("/api/gemini-orientation", async (req, res) => {
+  const apiKey = String(process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey) {
+    return res.status(503).json({
+      error:
+        "Gemini is not configured on this server. Set GEMINI_API_KEY in environment variables.",
+    });
+  }
+
+  const imageDataUrl = req.body?.imageDataUrl;
+  const imagePart = parseImageDataUrl(imageDataUrl);
+  if (!imagePart) {
+    return res.status(400).json({
+      error:
+        "Invalid imageDataUrl. Send a base64 data URL (data:image/jpeg;base64,...)",
+    });
+  }
+  if (imagePart.data.length > GEMINI_MAX_IMAGE_BASE64_BYTES) {
+    return res.status(413).json({ error: "Image is too large for orientation analysis." });
+  }
+
+  try {
+    const result = await callGeminiOrientation(imagePart);
+    return res.json({
+      source: "gemini",
+      model: GEMINI_MODEL,
+      ...result,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return res.status(504).json({ error: "Gemini request timed out." });
+    }
+    if (error?.status === 401 || error?.status === 403) {
+      return res.status(502).json({
+        error: "Gemini authentication failed. Verify GEMINI_API_KEY in the server settings.",
+      });
+    }
+    if (error?.status === 429) {
+      return res.status(429).json({
+        error: "Gemini quota/rate limit reached. Try again or check billing/quota.",
+      });
+    }
+    return res.status(502).json({
+      error: error?.message || "Gemini orientation analysis failed.",
+    });
   }
 });
 

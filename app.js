@@ -28,6 +28,8 @@ const cameraPreview = document.getElementById("cameraPreview");
 const cameraOverlay = document.getElementById("cameraOverlay");
 const flashToggleBtn = document.getElementById("flashToggleBtn");
 const flashToggleText = document.getElementById("flashToggleText");
+const autoCaptureToggleBtn = document.getElementById("autoCaptureToggleBtn");
+const autoCaptureToggleText = document.getElementById("autoCaptureToggleText");
 const retakeBtn = document.getElementById("retakeBtn");
 const startEditQueueBtn = document.getElementById("startEditQueueBtn");
 const nextToPreviewBtn = document.getElementById("nextToPreviewBtn");
@@ -44,6 +46,9 @@ const scanSourceCanvas = document.getElementById("scanSourceCanvas");
 const scanEditOverlay = document.getElementById("scanEditOverlay");
 const scanHandles = document.getElementById("scanHandles");
 const scanRotateInput = document.getElementById("scanRotateInput");
+const rotateLeftBtn = document.getElementById("rotateLeftBtn");
+const rotateRightBtn = document.getElementById("rotateRightBtn");
+const rotate180Btn = document.getElementById("rotate180Btn");
 const scanBrightnessInput = document.getElementById("scanBrightnessInput");
 const scanContrastInput = document.getElementById("scanContrastInput");
 const scanSharpnessInput = document.getElementById("scanSharpnessInput");
@@ -86,6 +91,28 @@ const scanState = {
   liveDetectedCorners: null,
   jscanifyEngine: null,
   lowLightWarnedAt: 0,
+  aiAssistCanvas: null,
+  aiAssistCtx: null,
+  aiAssistCornersNormalized: null,
+  aiAssistCornersAt: 0,
+  aiAssistUnavailableUntil: 0,
+  aiAssistInFlight: false,
+  aiAssistLastAt: 0,
+  aiAssistLastAdviceAt: 0,
+  autoCaptureEnabled: false,
+  autoCaptureStableSince: 0,
+  autoCaptureLastCorners: null,
+  autoCaptureLastSeenAt: 0,
+  autoCaptureCooldownUntil: 0,
+  autoCaptureLastStatusAt: 0,
+  autoCaptureNeedsMotionReset: false,
+  autoCaptureLastMotionScore: 0,
+  autoCaptureLastAreaRatio: 0,
+  motionFrameRef: null,
+  captureInProgress: false,
+  suggestedFileName: "scan",
+  orientationDetectInFlight: false,
+  orientationSuggestionDeg: 0,
   retakeInsertIndex: null,
   pendingRawCaptures: [],
   currentRawCapture: null,
@@ -108,6 +135,16 @@ const scanState = {
 
 const LOW_LIGHT_THRESHOLD = 52;
 const LOW_LIGHT_WARN_COOLDOWN_MS = 4500;
+const AI_DOC_CHECK_MIN_INTERVAL_MS = 2600;
+const AI_ADVICE_COOLDOWN_MS = 5000;
+const AI_CORNER_TTL_MS = 3400;
+const AUTO_CAPTURE_STABLE_MS = 1400;
+const AUTO_CAPTURE_COOLDOWN_MS = 1800;
+const AUTO_CAPTURE_MAX_JITTER_PX = 9;
+const AUTO_CAPTURE_MIN_DOC_AREA_RATIO = 0.16;
+const AUTO_CAPTURE_MAX_MOTION_SCORE = 15;
+const AUTO_CAPTURE_RESET_MOTION_SCORE = 17;
+const AUTO_CAPTURE_STATUS_COOLDOWN_MS = 700;
 let opencvReady = false;
 
 function initOpenCvRuntimeHook() {
@@ -633,6 +670,90 @@ function syncScanControlsFromInputs() {
   scanState.controls.contrast = Number(scanContrastInput?.value || 100);
   scanState.controls.sharpness = Number(scanSharpnessInput?.value || 0);
   scanState.cachedOutputCanvas = null;
+  refreshPreviewCanvasIfVisible();
+}
+
+function normalizeRotationDeg(value) {
+  let deg = Number(value) || 0;
+  while (deg > 180) {
+    deg -= 360;
+  }
+  while (deg < -180) {
+    deg += 360;
+  }
+  return Math.round(deg);
+}
+
+function triggerRotationAnimation() {
+  if (!scanSourceWrap) {
+    return;
+  }
+  scanSourceWrap.classList.remove("rotation-anim");
+  void scanSourceWrap.offsetWidth;
+  scanSourceWrap.classList.add("rotation-anim");
+}
+
+function setRotationDegrees(degrees) {
+  const normalized = normalizeRotationDeg(degrees);
+  scanState.controls.rotate = normalized;
+  if (scanRotateInput) {
+    scanRotateInput.value = String(normalized);
+  }
+  scanState.cachedOutputCanvas = null;
+  triggerRotationAnimation();
+  refreshPreviewCanvasIfVisible();
+}
+
+function rotateCurrentEditorPageBy(deltaDeg) {
+  if (!scanState.sourceCanvas) {
+    return false;
+  }
+  const rotatedCanvas = rotateCanvas(scanState.sourceCanvas, deltaDeg);
+  const rotatedCtx = rotatedCanvas.getContext("2d", { willReadFrequently: true });
+  if (!rotatedCtx) {
+    return false;
+  }
+  scanState.sourceCanvas = rotatedCanvas;
+  scanState.sourceCtx = rotatedCtx;
+  scanState.corners = createDefaultCorners(rotatedCanvas.width, rotatedCanvas.height, 0.03);
+  scanState.controls.rotate = 0;
+  if (scanRotateInput) {
+    scanRotateInput.value = "0";
+  }
+  scanState.cropDirty = true;
+  scanState.cachedCroppedCanvas = null;
+  scanState.cachedOutputCanvas = null;
+  triggerRotationAnimation();
+  renderScanSource();
+  refreshPreviewCanvasIfVisible();
+  return true;
+}
+
+function rotateBy(deltaDeg) {
+  if (scanState.stage === "edit" && scanState.sourceCanvas) {
+    rotateCurrentEditorPageBy(deltaDeg);
+    return;
+  }
+  setRotationDegrees((scanState.controls.rotate || 0) + deltaDeg);
+}
+
+async function applyAutoRotateSuggestion() {
+  if (!scanState.sourceCanvas || !scanState.corners) {
+    throw new Error("Capture and open a page first.");
+  }
+  setScanProcessing(true, "Analyzing page orientation...");
+  try {
+    await suggestAutoRotationForCurrentPage();
+    const suggested = normalizeRotationDeg(scanState.orientationSuggestionDeg || 0);
+    if (Math.abs(suggested) < 45) {
+      setStatus("Orientation already looks correct.");
+      return;
+    }
+    setRotationDegrees((scanState.controls.rotate || 0) + suggested);
+    setStatus(`Auto rotated by ${suggested}°.`);
+  } finally {
+    setScanProcessing(false);
+  }
 }
 
 function applyFilterPreset(filterName) {
@@ -947,6 +1068,179 @@ function detectDocumentCornersFromImageData(imageData, width, height) {
   ];
 }
 
+function ensureAiAssistCanvas(width, height) {
+  if (!scanState.aiAssistCanvas) {
+    scanState.aiAssistCanvas = document.createElement("canvas");
+    scanState.aiAssistCtx = scanState.aiAssistCanvas.getContext("2d", {
+      willReadFrequently: true,
+    });
+  }
+  if (!scanState.aiAssistCanvas || !scanState.aiAssistCtx) {
+    return null;
+  }
+  if (scanState.aiAssistCanvas.width !== width || scanState.aiAssistCanvas.height !== height) {
+    scanState.aiAssistCanvas.width = width;
+    scanState.aiAssistCanvas.height = height;
+  }
+  return scanState.aiAssistCanvas;
+}
+
+function buildAiAssistImageDataUrl(imageData, width, height) {
+  const canvas = ensureAiAssistCanvas(width, height);
+  const ctx = scanState.aiAssistCtx;
+  if (!canvas || !ctx) {
+    return null;
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/jpeg", 0.72);
+}
+
+function normalizeAiCorners(rawCorners) {
+  if (!Array.isArray(rawCorners) || rawCorners.length !== 4) {
+    return null;
+  }
+  const parsed = rawCorners.map((entry) => ({
+    x: Number(entry?.x),
+    y: Number(entry?.y),
+  }));
+  if (
+    parsed.some(
+      (point) =>
+        !Number.isFinite(point.x) ||
+        !Number.isFinite(point.y) ||
+        point.x < 0 ||
+        point.x > 1 ||
+        point.y < 0 ||
+        point.y > 1
+    )
+  ) {
+    return null;
+  }
+  return orderCornersClockwise(parsed);
+}
+
+function scaleNormalizedCorners(corners, width, height) {
+  if (!Array.isArray(corners) || corners.length !== 4) {
+    return null;
+  }
+  return corners.map((point) => ({
+    x: clamp(point.x * width, 0, width),
+    y: clamp(point.y * height, 0, height),
+  }));
+}
+
+function reportAiAssistStatus(message) {
+  const now = Date.now();
+  if (now - scanState.aiAssistLastAdviceAt < AI_ADVICE_COOLDOWN_MS) {
+    return;
+  }
+  scanState.aiAssistLastAdviceAt = now;
+  setStatus(message);
+}
+
+async function requestGeminiAssist(frame, width, height) {
+  const now = Date.now();
+  if (
+    !window.location.protocol.startsWith("http") ||
+    scanState.stage !== "live" ||
+    scanState.aiAssistInFlight ||
+    now - scanState.aiAssistLastAt < AI_DOC_CHECK_MIN_INTERVAL_MS ||
+    now < scanState.aiAssistUnavailableUntil
+  ) {
+    return;
+  }
+
+  const imageDataUrl = buildAiAssistImageDataUrl(frame, width, height);
+  if (!imageDataUrl) {
+    return;
+  }
+
+  scanState.aiAssistInFlight = true;
+  scanState.aiAssistLastAt = now;
+  try {
+    const response = await fetch("/api/gemini-doc-detect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageDataUrl }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 503 || response.status === 401 || response.status === 403) {
+        scanState.aiAssistUnavailableUntil = Date.now() + 120000;
+        reportAiAssistStatus("Gemini key missing/invalid on server. Using OpenCV + jscanify.");
+      } else if (response.status === 429) {
+        reportAiAssistStatus("Gemini rate-limited. Local edge detection is still active.");
+      }
+      return;
+    }
+
+    const normalizedCorners = normalizeAiCorners(payload?.corners);
+    if (payload?.documentDetected && normalizedCorners) {
+      scanState.aiAssistCornersNormalized = normalizedCorners;
+      scanState.aiAssistCornersAt = Date.now();
+      if (typeof payload.advice === "string" && payload.advice.trim()) {
+        reportAiAssistStatus(`AI assist: ${payload.advice.trim()}`);
+      }
+      return;
+    }
+    scanState.aiAssistCornersNormalized = null;
+    scanState.aiAssistCornersAt = 0;
+  } catch {
+    // Ignore transient network errors and keep local detection active.
+  } finally {
+    scanState.aiAssistInFlight = false;
+  }
+}
+
+async function requestGeminiOrientation(imageDataUrl) {
+  if (!window.location.protocol.startsWith("http")) {
+    return null;
+  }
+  const response = await fetch("/api/gemini-orientation", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageDataUrl }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.error || "Auto rotate analysis failed.");
+  }
+  const suggested = Number(payload?.rotation || 0);
+  const normalized = normalizeRotationDeg(suggested);
+  return {
+    rotation: normalized,
+    confidence: Number(payload?.confidence || 0),
+    reason: String(payload?.reason || ""),
+  };
+}
+
+async function suggestAutoRotationForCurrentPage() {
+  if (scanState.orientationDetectInFlight) {
+    return;
+  }
+  const cropCanvas = getCropCanvasFromCorners();
+  if (!cropCanvas) {
+    return;
+  }
+  scanState.orientationDetectInFlight = true;
+  try {
+    const analysisCanvas = scaleCanvasToMax(cropCanvas, 1100);
+    const dataUrl = analysisCanvas.toDataURL("image/jpeg", 0.76);
+    const suggestion = await requestGeminiOrientation(dataUrl);
+    if (!suggestion) {
+      return;
+    }
+    scanState.orientationSuggestionDeg = suggestion.rotation;
+    if (Math.abs(suggestion.rotation) >= 45) {
+      setStatus(`Orientation suggestion detected: ${suggestion.rotation}°.`);
+    }
+  } catch {
+    scanState.orientationSuggestionDeg = 0;
+  } finally {
+    scanState.orientationDetectInFlight = false;
+  }
+}
+
 function clearLiveOverlay() {
   const ctx = cameraOverlay?.getContext("2d");
   if (ctx) {
@@ -973,6 +1267,178 @@ function estimateFrameBrightness(imageData) {
     return 0;
   }
   return total / count;
+}
+
+function polygonArea(points) {
+  if (!Array.isArray(points) || points.length < 3) {
+    return 0;
+  }
+  let sum = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % points.length];
+    sum += p1.x * p2.y - p2.x * p1.y;
+  }
+  return Math.abs(sum) * 0.5;
+}
+
+function estimateDocumentAreaRatio(corners, width, height) {
+  if (!corners || !width || !height) {
+    return 0;
+  }
+  return polygonArea(corners) / (width * height);
+}
+
+function estimateCornerJitter(currentCorners, previousCorners) {
+  if (!currentCorners || !previousCorners || currentCorners.length !== 4 || previousCorners.length !== 4) {
+    return Number.POSITIVE_INFINITY;
+  }
+  let total = 0;
+  for (let i = 0; i < 4; i += 1) {
+    total += pointDistance(currentCorners[i], previousCorners[i]);
+  }
+  return total / 4;
+}
+
+function estimateFrameMotion(imageData, width, height) {
+  const step = 6;
+  const sampleCols = Math.max(1, Math.floor(width / step));
+  const sampleRows = Math.max(1, Math.floor(height / step));
+  const sampleLen = sampleCols * sampleRows;
+  const current = new Uint8Array(sampleLen);
+  const src = imageData.data;
+  let s = 0;
+
+  for (let y = 0; y < sampleRows; y += 1) {
+    const py = Math.min(height - 1, y * step);
+    for (let x = 0; x < sampleCols; x += 1) {
+      const px = Math.min(width - 1, x * step);
+      const idx = (py * width + px) * 4;
+      const r = src[idx];
+      const g = src[idx + 1];
+      const b = src[idx + 2];
+      current[s] = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b);
+      s += 1;
+    }
+  }
+
+  const prev = scanState.motionFrameRef;
+  scanState.motionFrameRef = { width, height, sampleCols, sampleRows, data: current };
+
+  if (!prev || prev.width !== width || prev.height !== height || prev.data.length !== current.length) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  let diffTotal = 0;
+  for (let i = 0; i < current.length; i += 1) {
+    diffTotal += Math.abs(current[i] - prev.data[i]);
+  }
+  return diffTotal / current.length;
+}
+
+function normalizeCornersFromPixels(corners, width, height) {
+  if (!Array.isArray(corners) || corners.length !== 4 || !width || !height) {
+    return null;
+  }
+  return corners.map((point) => ({
+    x: clamp(point.x / width, 0, 1),
+    y: clamp(point.y / height, 0, 1),
+  }));
+}
+
+function getOverlayColorFromAutoState(autoState, hasTrustedCorners) {
+  if (!hasTrustedCorners) {
+    return "rgba(255,255,255,0.82)";
+  }
+  if (autoState.isCandidate && autoState.stabilityRatio >= 0.99) {
+    return "rgba(80,255,150,0.95)";
+  }
+  if (autoState.isCandidate) {
+    return "rgba(100,190,255,0.92)";
+  }
+  return "rgba(255,255,255,0.88)";
+}
+
+async function triggerAutoCapture() {
+  if (scanState.captureInProgress || scanState.stage !== "live") {
+    return;
+  }
+  try {
+    scanState.autoCaptureNeedsMotionReset = true;
+    await captureFromCamera(true);
+  } catch {
+    // Keep manual mode working even if auto capture fails for one frame.
+  }
+}
+
+function updateAutoCaptureState(corners, frame, width, height, now) {
+  const motionScore = estimateFrameMotion(frame, width, height);
+  scanState.autoCaptureLastMotionScore = Number.isFinite(motionScore) ? motionScore : 0;
+  const areaRatio = estimateDocumentAreaRatio(corners, width, height);
+  scanState.autoCaptureLastAreaRatio = areaRatio;
+
+  const hasCorners = Boolean(corners);
+  if (!hasCorners || now < scanState.autoCaptureCooldownUntil) {
+    scanState.autoCaptureStableSince = 0;
+    scanState.autoCaptureLastCorners = hasCorners ? cloneCorners(corners) : null;
+    if (hasCorners) {
+      scanState.autoCaptureLastSeenAt = now;
+    }
+    return { isCandidate: false, stabilityRatio: 0 };
+  }
+
+  if (scanState.autoCaptureNeedsMotionReset) {
+    if (Number.isFinite(motionScore) && motionScore >= AUTO_CAPTURE_RESET_MOTION_SCORE) {
+      scanState.autoCaptureNeedsMotionReset = false;
+    } else {
+      return { isCandidate: false, stabilityRatio: 0 };
+    }
+  }
+
+  const areaOk = areaRatio >= AUTO_CAPTURE_MIN_DOC_AREA_RATIO;
+  const motionOk = Number.isFinite(motionScore) && motionScore <= AUTO_CAPTURE_MAX_MOTION_SCORE;
+  if (!areaOk || !motionOk) {
+    scanState.autoCaptureStableSince = 0;
+    scanState.autoCaptureLastCorners = cloneCorners(corners);
+    scanState.autoCaptureLastSeenAt = now;
+    return { isCandidate: false, stabilityRatio: 0 };
+  }
+
+  const jitter = estimateCornerJitter(corners, scanState.autoCaptureLastCorners);
+  const seenGap = now - scanState.autoCaptureLastSeenAt;
+  scanState.autoCaptureLastCorners = cloneCorners(corners);
+  scanState.autoCaptureLastSeenAt = now;
+
+  if (!Number.isFinite(jitter) || jitter > AUTO_CAPTURE_MAX_JITTER_PX || seenGap > 520) {
+    scanState.autoCaptureStableSince = now;
+  } else if (!scanState.autoCaptureStableSince) {
+    scanState.autoCaptureStableSince = now;
+  }
+
+  const stableMs = Math.max(0, now - scanState.autoCaptureStableSince);
+  const stabilityRatio = clamp(stableMs / AUTO_CAPTURE_STABLE_MS, 0, 1);
+  const isCandidate = true;
+
+  if (
+    scanState.autoCaptureEnabled &&
+    stabilityRatio >= 1 &&
+    !scanState.captureInProgress &&
+    now >= scanState.autoCaptureCooldownUntil
+  ) {
+    scanState.autoCaptureCooldownUntil = now + AUTO_CAPTURE_COOLDOWN_MS;
+    scanState.autoCaptureStableSince = 0;
+    triggerAutoCapture();
+  } else if (
+    scanState.autoCaptureEnabled &&
+    stabilityRatio < 1 &&
+    now - scanState.autoCaptureLastStatusAt > AUTO_CAPTURE_STATUS_COOLDOWN_MS
+  ) {
+    const sec = ((AUTO_CAPTURE_STABLE_MS - stableMs) / 1000).toFixed(1);
+    setStatus(`Document stable. Auto capture in ${Math.max(0, sec)}s...`);
+    scanState.autoCaptureLastStatusAt = now;
+  }
+
+  return { isCandidate, stabilityRatio };
 }
 
 function drawLiveDetectionBoundary() {
@@ -1009,7 +1475,28 @@ function drawLiveDetectionBoundary() {
     setStatus("Low light detected. Enable flash or increase lighting for better edge detection.");
   }
   const detectedRaw = detectDocumentCornersFromImageData(frame, detectWidth, detectHeight);
-  const detected = detectedRaw || createDefaultCorners(detectWidth, detectHeight, 0.12);
+  // AI-first auto detection (throttled): Gemini updates corners in the background.
+  requestGeminiAssist(frame, detectWidth, detectHeight);
+
+  const hasFreshAiCorners =
+    Array.isArray(scanState.aiAssistCornersNormalized) &&
+    now - scanState.aiAssistCornersAt <= AI_CORNER_TTL_MS;
+  const aiDetectedRaw = hasFreshAiCorners
+    ? scaleNormalizedCorners(
+        scanState.aiAssistCornersNormalized,
+        detectWidth,
+        detectHeight
+      )
+    : null;
+  const detected = aiDetectedRaw || detectedRaw || createDefaultCorners(detectWidth, detectHeight, 0.12);
+  const trustedCorners = aiDetectedRaw || detectedRaw;
+  const autoState = updateAutoCaptureState(
+    trustedCorners,
+    frame,
+    detectWidth,
+    detectHeight,
+    now
+  );
   const sx = cameraOverlay.width / detectWidth;
   const sy = cameraOverlay.height / detectHeight;
   const scaledCorners = detected.map((point) => ({
@@ -1017,14 +1504,15 @@ function drawLiveDetectionBoundary() {
     y: point.y * sy,
   }));
   scanState.liveCorners = scaledCorners;
-  scanState.liveDetectedCorners = detectedRaw
-    ? detectedRaw.map((point) => ({
+  scanState.liveDetectedCorners = trustedCorners
+    ? trustedCorners.map((point) => ({
         x: point.x * sx,
         y: point.y * sy,
       }))
     : null;
   const overlayCtx = cameraOverlay.getContext("2d");
-  drawPolygon(overlayCtx, scaledCorners, "rgba(255,255,255,0.88)");
+  const overlayColor = getOverlayColorFromAutoState(autoState, Boolean(trustedCorners));
+  drawPolygon(overlayCtx, scaledCorners, overlayColor);
 }
 
 function startLiveDetection() {
@@ -1042,6 +1530,14 @@ function stopLiveDetection() {
   }
   scanState.liveCorners = null;
   scanState.liveDetectedCorners = null;
+  scanState.aiAssistCornersNormalized = null;
+  scanState.aiAssistCornersAt = 0;
+  scanState.autoCaptureStableSince = 0;
+  scanState.autoCaptureLastCorners = null;
+  scanState.autoCaptureLastSeenAt = 0;
+  scanState.autoCaptureCooldownUntil = 0;
+  scanState.autoCaptureNeedsMotionReset = false;
+  scanState.motionFrameRef = null;
   clearLiveOverlay();
 }
 
@@ -1115,6 +1611,37 @@ function updateFlashButtonState() {
     scanState.torchOn ? "Flash On" : "Flash Off",
     flashToggleText
   );
+}
+
+function updateAutoCaptureButtonState() {
+  if (!autoCaptureToggleBtn) {
+    return;
+  }
+  const enabled = Boolean(scanState.autoCaptureEnabled);
+  autoCaptureToggleBtn.classList.toggle("active", enabled);
+  setControlText(
+    autoCaptureToggleBtn,
+    enabled ? "Auto Capture On" : "Auto Capture Off",
+    autoCaptureToggleText
+  );
+}
+
+function setAutoCaptureEnabled(enabled, announce = true) {
+  scanState.autoCaptureEnabled = Boolean(enabled);
+  scanState.autoCaptureStableSince = 0;
+  scanState.autoCaptureLastCorners = null;
+  scanState.autoCaptureLastSeenAt = 0;
+  scanState.autoCaptureLastStatusAt = 0;
+  scanState.motionFrameRef = null;
+  updateAutoCaptureButtonState();
+  if (!announce) {
+    return;
+  }
+  if (scanState.autoCaptureEnabled) {
+    setStatus("Auto capture enabled. Hold document steady to capture automatically.");
+  } else {
+    setStatus("Auto capture disabled. Use Capture Photo manually.");
+  }
 }
 
 async function setTorchEnabled(enabled) {
@@ -1530,6 +2057,30 @@ function applyPreviewZoom() {
   scanZoomLabel.textContent = `${zoom}%`;
 }
 
+function renderPreviewCanvasWithCurrentOutput() {
+  if (!scanPreviewCanvas) {
+    return false;
+  }
+  const result = buildProcessedOutputCanvas();
+  if (!result) {
+    return false;
+  }
+  scanPreviewCanvas.width = result.width;
+  scanPreviewCanvas.height = result.height;
+  const previewCtx = scanPreviewCanvas.getContext("2d");
+  previewCtx?.clearRect(0, 0, result.width, result.height);
+  previewCtx?.drawImage(result, 0, 0);
+  applyPreviewZoom();
+  return true;
+}
+
+function refreshPreviewCanvasIfVisible() {
+  if (scanState.stage !== "preview") {
+    return;
+  }
+  renderPreviewCanvasWithCurrentOutput();
+}
+
 async function canvasToBlob(canvas, type = "image/jpeg", quality = 0.95) {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -1579,7 +2130,13 @@ async function loadCurrentCaptureIntoEditor() {
       throw new Error("Canvas is not supported in this browser.");
     }
     const frame = workCtx.getImageData(0, 0, workCanvas.width, workCanvas.height);
+    const aiSuggestedCorners = scaleNormalizedCorners(
+      scanState.currentRawCapture?.suggestedCornersNormalized,
+      workCanvas.width,
+      workCanvas.height
+    );
     const detectedCorners =
+      aiSuggestedCorners ||
       detectDocumentCornersFromImageData(frame, workCanvas.width, workCanvas.height) ||
       createDefaultCorners(workCanvas.width, workCanvas.height);
 
@@ -1684,6 +2241,27 @@ async function openCamera() {
     setScanEditMode("all");
     scanState.liveDetectedCorners = null;
     scanState.lowLightWarnedAt = 0;
+    scanState.aiAssistInFlight = false;
+    scanState.aiAssistLastAt = 0;
+    scanState.aiAssistLastAdviceAt = 0;
+    scanState.aiAssistUnavailableUntil = 0;
+    scanState.aiAssistCornersNormalized = null;
+    scanState.aiAssistCornersAt = 0;
+    scanState.autoCaptureStableSince = 0;
+    scanState.autoCaptureLastCorners = null;
+    scanState.autoCaptureLastSeenAt = 0;
+    scanState.autoCaptureCooldownUntil = 0;
+    scanState.autoCaptureLastStatusAt = 0;
+    scanState.autoCaptureNeedsMotionReset = false;
+    scanState.autoCaptureLastMotionScore = 0;
+    scanState.autoCaptureLastAreaRatio = 0;
+    scanState.motionFrameRef = null;
+    scanState.autoCaptureEnabled = false;
+    scanState.captureInProgress = false;
+    scanState.suggestedFileName = "scan";
+    scanState.orientationDetectInFlight = false;
+    scanState.orientationSuggestionDeg = 0;
+    updateAutoCaptureButtonState();
     updateScanBadges();
 
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -1724,7 +2302,12 @@ function stopCamera() {
   }
   scanState.torchOn = false;
   scanState.torchSupported = false;
+  scanState.autoCaptureEnabled = false;
+  scanState.captureInProgress = false;
+  scanState.motionFrameRef = null;
+  scanState.autoCaptureNeedsMotionReset = false;
   updateFlashButtonState();
+  updateAutoCaptureButtonState();
   clearQueuedRawCaptures();
   resetScanEditState();
   resetScanControls();
@@ -1735,6 +2318,12 @@ function stopCamera() {
 }
 
 async function captureFromCamera(autoTriggered = false) {
+  if (scanState.captureInProgress) {
+    if (!autoTriggered) {
+      setStatus("Capture already in progress...");
+    }
+    return;
+  }
   if (!activeCameraStream) {
     throw new Error("Camera is not open.");
   }
@@ -1744,46 +2333,57 @@ async function captureFromCamera(autoTriggered = false) {
     throw new Error("Camera not ready yet. Try again.");
   }
 
+  scanState.captureInProgress = true;
   setScanProcessing(true, autoTriggered ? "Auto-capturing document..." : "Capturing document...");
-  const rawCanvas = document.createElement("canvas");
-  rawCanvas.width = videoWidth;
-  rawCanvas.height = videoHeight;
-  const rawCtx = rawCanvas.getContext("2d");
-  if (!rawCtx) {
-    setScanProcessing(false);
-    throw new Error("Canvas is not supported in this browser.");
-  }
-  rawCtx.drawImage(cameraPreview, 0, 0, videoWidth, videoHeight);
-  const workCanvas = scaleCanvasToMax(rawCanvas, 1800);
-  const blob = await canvasToBlob(workCanvas, "image/jpeg", 0.96);
-  const thumbUrl = URL.createObjectURL(blob);
-  const capture = {
-    id: `raw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    blob,
-    thumbUrl,
-  };
+  try {
+    const rawCanvas = document.createElement("canvas");
+    rawCanvas.width = videoWidth;
+    rawCanvas.height = videoHeight;
+    const rawCtx = rawCanvas.getContext("2d");
+    if (!rawCtx) {
+      throw new Error("Canvas is not supported in this browser.");
+    }
+    rawCtx.drawImage(cameraPreview, 0, 0, videoWidth, videoHeight);
+    const workCanvas = scaleCanvasToMax(rawCanvas, 1800);
+    const blob = await canvasToBlob(workCanvas, "image/jpeg", 0.96);
+    const thumbUrl = URL.createObjectURL(blob);
+    const suggestedCornersNormalized = normalizeCornersFromPixels(
+      scanState.liveDetectedCorners,
+      videoWidth,
+      videoHeight
+    );
+    const capture = {
+      id: `raw-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      blob,
+      thumbUrl,
+      suggestedCornersNormalized: suggestedCornersNormalized
+        ? cloneCorners(suggestedCornersNormalized)
+        : null,
+    };
 
-  if (Number.isInteger(scanState.retakeInsertIndex) && scanState.retakeInsertIndex >= 0) {
-    const insertIndex = Math.min(scanState.retakeInsertIndex, scanState.pendingRawCaptures.length);
-    scanState.pendingRawCaptures.splice(insertIndex, 0, capture);
-    scanState.currentRawCapture = capture;
-    scanState.retakeInsertIndex = null;
-    setScanProcessing(false);
+    if (Number.isInteger(scanState.retakeInsertIndex) && scanState.retakeInsertIndex >= 0) {
+      const insertIndex = Math.min(scanState.retakeInsertIndex, scanState.pendingRawCaptures.length);
+      scanState.pendingRawCaptures.splice(insertIndex, 0, capture);
+      scanState.currentRawCapture = capture;
+      scanState.retakeInsertIndex = null;
+      updateScanBadges();
+      setStatus(
+        `${autoTriggered ? "Auto-captured" : "Retake captured"} for photo ${insertIndex + 1}. Opening editor...`
+      );
+      await loadCurrentCaptureIntoEditor();
+      setStatus(`Retake updated at photo ${insertIndex + 1}. Continue editing.`);
+      return;
+    }
+
+    scanState.pendingRawCaptures.push(capture);
     updateScanBadges();
     setStatus(
-      `${autoTriggered ? "Auto-captured" : "Retake captured"} for photo ${insertIndex + 1}. Opening editor...`
+      `${autoTriggered ? "Auto-captured" : "Captured"} ${scanState.pendingRawCaptures.length} photo(s). Capture more, then tap Next: Edit All.`
     );
-    await loadCurrentCaptureIntoEditor();
-    setStatus(`Retake updated at photo ${insertIndex + 1}. Continue editing.`);
-    return;
+  } finally {
+    setScanProcessing(false);
+    scanState.captureInProgress = false;
   }
-
-  scanState.pendingRawCaptures.push(capture);
-  setScanProcessing(false);
-  updateScanBadges();
-  setStatus(
-    `${autoTriggered ? "Auto-captured" : "Captured"} ${scanState.pendingRawCaptures.length} photo(s). Capture more, then tap Next: Edit All.`
-  );
 }
 
 async function showScanPreview() {
@@ -1793,28 +2393,23 @@ async function showScanPreview() {
   syncScanControlsFromInputs();
   setScanProcessing(true, "Rendering preview...");
   await new Promise((resolve) => requestAnimationFrame(resolve));
-  const result = buildProcessedOutputCanvas();
-  if (!result) {
+  const hasPreview = renderPreviewCanvasWithCurrentOutput();
+  if (!hasPreview) {
     setScanProcessing(false);
     throw new Error("Could not generate preview.");
   }
-  if (!scanPreviewCanvas) {
-    setScanProcessing(false);
-    throw new Error("Preview canvas is unavailable.");
-  }
-  scanPreviewCanvas.width = result.width;
-  scanPreviewCanvas.height = result.height;
-  const previewCtx = scanPreviewCanvas.getContext("2d");
-  previewCtx?.clearRect(0, 0, result.width, result.height);
-  previewCtx?.drawImage(result, 0, 0);
-  applyPreviewZoom();
   scanPreviewWrap?.scrollTo({ top: 0, left: 0, behavior: "auto" });
   setScanStage("preview");
   setScanProcessing(false);
   setStatus("Preview ready. Tap Finish to apply this style to all captured pages.");
 }
 
-async function buildProcessedCanvasFromRawBlob(rawBlob, controls, filter) {
+async function buildProcessedCanvasFromRawBlob(
+  rawBlob,
+  controls,
+  filter,
+  suggestedCornersNormalized = null
+) {
   const image = await blobToImage(rawBlob);
   const rawCanvas = document.createElement("canvas");
   rawCanvas.width = image.width;
@@ -1830,7 +2425,13 @@ async function buildProcessedCanvasFromRawBlob(rawBlob, controls, filter) {
     throw new Error("Canvas is not supported in this browser.");
   }
   const frame = workCtx.getImageData(0, 0, workCanvas.width, workCanvas.height);
+  const aiSuggestedCorners = scaleNormalizedCorners(
+    suggestedCornersNormalized,
+    workCanvas.width,
+    workCanvas.height
+  );
   const detectedCorners =
+    aiSuggestedCorners ||
     detectDocumentCornersFromImageData(frame, workCanvas.width, workCanvas.height) ||
     createDefaultCorners(workCanvas.width, workCanvas.height);
 
@@ -1925,7 +2526,8 @@ async function saveCurrentScan() {
       const outputCanvas = await buildProcessedCanvasFromRawBlob(
         capture.blob,
         controlsSnapshot,
-        filterSnapshot
+        filterSnapshot,
+        capture.suggestedCornersNormalized
       );
       const blob = await canvasToBlob(outputCanvas, "image/jpeg", 0.96);
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -2548,11 +3150,6 @@ dropzone.addEventListener("drop", (event) => {
 openCameraBtn?.addEventListener("click", async () => {
   try {
     await openCamera();
-    const cvText = opencvReady ? "OpenCV" : "fallback";
-    const jscanText = window.jscanify ? "jscanify" : "native";
-    setStatus(
-      `Camera scanner is ready (${cvText} + ${jscanText}). Live edge detection and corner overlay are active.`
-    );
   } catch (error) {
     setStatus(`Failed: ${error.message}`);
   }
@@ -2590,6 +3187,10 @@ flashToggleBtn?.addEventListener("click", async () => {
   } catch (error) {
     setStatus(`Flash: ${error.message}`);
   }
+});
+
+autoCaptureToggleBtn?.addEventListener("click", () => {
+  setAutoCaptureEnabled(!scanState.autoCaptureEnabled, true);
 });
 
 retakeBtn?.addEventListener("click", () => {
@@ -2638,6 +3239,21 @@ saveScanBtn?.addEventListener("click", async () => {
   }
 });
 
+rotateLeftBtn?.addEventListener("click", () => {
+  rotateBy(-90);
+  setStatus("Rotated left 90°.");
+});
+
+rotateRightBtn?.addEventListener("click", () => {
+  rotateBy(90);
+  setStatus("Rotated right 90°.");
+});
+
+rotate180Btn?.addEventListener("click", () => {
+  rotateBy(180);
+  setStatus("Rotated 180°.");
+});
+
 [scanRotateInput, scanBrightnessInput, scanContrastInput, scanSharpnessInput].forEach(
   (input) => {
     input?.addEventListener("input", () => {
@@ -2663,6 +3279,8 @@ applyAllToggle?.addEventListener("change", () => {
       : "Apply-all disabled: press Done & Next to save current photo and move to the next one."
   );
 });
+
+updateAutoCaptureButtonState();
 
 window.addEventListener("resize", () => {
   syncVideoOverlaySize();
