@@ -2,10 +2,6 @@
 <img width="3342" height="1812" alt="image" src="https://github.com/user-attachments/assets/e6195fc0-325e-4433-9e6d-2e976f408a61" />
 <img width="3408" height="2032" alt="image" src="https://github.com/user-attachments/assets/83efd43c-3095-4e71-b137-dd4cc3761c8c" />
 
-
-
-Project documentation (single file): [`Documentation-Nova.md`](./Documentation-Nova.md).
-
 A lightweight website that converts documents to PDF.
 It supports browser-side conversion for text/images and server-side conversion for Office files using LibreOffice.
 
