@@ -1,88 +1,121 @@
 # Nova Converter
-A lightweight website that converts documents to PDF.
-It supports browser-side conversion for text/images and server-side conversion for Office files using LibreOffice.
 
-## Live Website
+<p align="center">
+  <img src="assets/logos/nova-logo.png" alt="Nova Converter Logo" width="220" />
+</p>
 
-- https://nova-converter.onrender.com/
+<p align="center"><strong>Fast document conversion, PDF compression, split & merge, and camera scan workflow in one web app.</strong></p>
 
-## Features
+<p align="center">
+  <img src="https://img.shields.io/badge/Node.js-Express-111827?style=for-the-badge&logo=node.js&logoColor=7ee787" alt="Node Express" />
+  <img src="https://img.shields.io/badge/PWA-Installable-111827?style=for-the-badge&logo=pwa&logoColor=9be9a8" alt="PWA" />
+  <img src="https://img.shields.io/badge/Deploy-Render-111827?style=for-the-badge&logo=render&logoColor=46e3b7" alt="Render" />
+</p>
 
-- Drag and drop file upload
-- Multi-photo selection: combine many images into one PDF
-- Direct camera capture option (take photo and convert)
-- AI-style camera scanning: live edge detection, 4-corner overlay, perspective correction
-- Optional target PDF size input with `KB`/`MB` unit selector
-- Convert to PDF for:
-  - Text/code files (`.txt`, `.md`, `.csv`, `.json`, `.js`, `.py`, etc.)
-  - Office files (`.doc/.docx/.ppt/.pptx/.xls/.xlsx/.odt/.odp/.ods`)
-  - Images (`.png`, `.jpg`, `.jpeg`, `.webp`)
-- Compress uploaded PDFs to a target size (`KB`/`MB`) using clarity-safe Heavy Compression (no raster blur)
-- Cinematic progress bar with live server progress polling and preview-before-download option
-- PWA ready: installable across desktop and mobile
-- Download generated PDF instantly
+## Live App
+- [nova-converter.onrender.com](https://nova-converter.onrender.com/)
 
-## Run
+## What It Does
+- Convert files to PDF (images, text/code files, Office docs)
+- Compress PDF with target size (`KB` / `MB`)
+- Merge multiple PDFs into one
+- Split a PDF by page, range, or selected pages
+- Camera capture + scan editing flow
+- Preview before download
+- Mobile-ready responsive UI
+
+## Feature Snapshot
+| Tool | Description |
+|---|---|
+| Compress PDF | Reduce file size with target `KB/MB` input and heavy mode option |
+| Convert to PDF | Convert docs/images/text to PDF quickly |
+| Merge PDF | Combine multiple PDFs in custom order |
+| Split PDF | Split every page, by ranges, or selected pages |
+| Camera Scan | Capture multiple pages and edit before export |
+
+## Supported Inputs
+- **PDF**: compression, split, merge
+- **Office**: `.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx`, `.odt`, `.ods`, `.odp`
+- **Images**: `.png`, `.jpg`, `.jpeg`, `.webp`
+- **Text/Code**: `.txt`, `.md`, `.csv`, `.json`, `.js`, `.ts`, `.py`, and more
+
+## Local Setup
 
 ### 1) Install dependencies
-
 ```bash
 cd doc-to-pdf-converter
 npm install
 ```
 
-### 2) Install Ghostscript + LibreOffice (required for compression and Office/PPT/Word/Excel conversion)
-
+### 2) Install system tools (required for Office conversion + PDF compression)
 ```bash
-brew install ghostscript libreoffice      # macOS (Homebrew)
-sudo apt-get install -y ghostscript libreoffice libreoffice-writer libreoffice-calc libreoffice-impress   # Debian/Ubuntu
+# macOS (Homebrew)
+brew install ghostscript libreoffice
+
+# Debian/Ubuntu
+sudo apt-get install -y ghostscript libreoffice libreoffice-writer libreoffice-calc libreoffice-impress
 ```
 
-Make sure `gs` and `soffice` are available in your terminal PATH.
-
 ### 3) Start server
-
 ```bash
-# Optional: enable Gemini-assisted camera document detection
-export GEMINI_API_KEY=your_gemini_api_key
-# Optional model override:
-# export GEMINI_MODEL=gemini-1.5-flash
-
 npm start
 ```
 
-Then open `http://localhost:8080`.
+Open: `http://localhost:8080`
 
-Gemini key is used only on the backend (`/api/gemini-doc-detect`) and is never exposed in frontend code.
+### Optional: Gemini-assisted camera detection
+```bash
+export GEMINI_API_KEY=your_key_here
+# optional
+export GEMINI_MODEL=gemini-1.5-flash
+```
 
-## Install as App (Mac, iPhone, Android, Windows)
+## PWA Install
+- **Mac (Safari)**: Share -> `Add to Dock`
+- **Chrome/Edge (Desktop)**: Install icon in address bar
+- **Android (Chrome)**: Menu -> `Install app`
+- **iPhone (Safari)**: Share -> `Add to Home Screen`
 
-Nova Converter is now configured as a PWA, so users can install it like an app.
-
-- Mac (Safari): open site -> Share -> `Add to Dock`.
-- Mac/Windows (Chrome/Edge): open site -> Install icon in address bar -> `Install`.
-- Android (Chrome): open site -> menu -> `Install app` / `Add to Home screen`.
-- iPhone (Safari): open site -> Share -> `Add to Home Screen`.
-
-## Public Deployment (Render)
-
-This project includes:
-- `Dockerfile` (Node + LibreOffice)
+## Deploy on Render
+This repo already includes:
+- `Dockerfile`
 - `render.yaml`
 
 Steps:
-1. Push this folder to a GitHub repository.
-2. In Render, create a new **Blueprint** service from that GitHub repo.
-3. Render reads `render.yaml` and deploys automatically.
-4. Use the Render URL as your public site.
+1. Push this repo to GitHub.
+2. In Render, create a new **Blueprint** service.
+3. Select this repo.
+4. Render reads `render.yaml` and deploys.
 
-## Note
+## Project Structure
+```text
+doc-to-pdf-converter/
+├── assets/
+│   ├── logos/
+│   └── tools/
+├── index.html
+├── split.html
+├── merge.html
+├── app.js
+├── split.js
+├── merge.js
+├── styles.css
+├── server.js
+├── service-worker.js
+└── render.yaml
+```
 
-`pptx/word/excel` conversion is handled by LibreOffice in the backend API (`/api/convert`).
-Unsupported or niche formats may still fail depending on LibreOffice support.
-PDF compression is handled by Ghostscript in `/api/compress-pdf`.
+## API Endpoints
+- `POST /api/convert` - convert file to PDF
+- `POST /api/compress-pdf` - compress PDF to target size
+- `GET /api/progress/:id` - conversion progress
+- `POST /api/gemini-doc-detect` - optional AI doc edge assist
+- `POST /api/gemini-orientation` - optional AI orientation assist
 
-Target-size matching is best-effort:
-- Image inputs: tries multiple compression levels to get close to the requested KB.
-- Text inputs: converts normally and reports actual output size.
-- Office files via server: converts and reports actual output size.
+## Notes
+- Office conversion uses **LibreOffice** (`soffice`) server-side.
+- Compression uses **Ghostscript** (`gs`) server-side.
+- Target size matching is best-effort for difficult files.
+
+## License
+Personal project by **Sharan Teja** for Nova Converter.
