@@ -4,23 +4,7 @@
   "trailingSlash": false,
   "functions": {
     "server.js": {
-      "includeFiles": [
-        "index.html",
-        "split.html",
-        "merge.html",
-        "styles.css",
-        "app.js",
-        "split.js",
-        "merge.js",
-        "menu.js",
-        "rain-bg.js",
-        "service-worker.js",
-        "manifest.webmanifest",
-        "robots.txt",
-        "sitemap.xml",
-        "google1169d12d3b7ad281.html",
-        "assets/**"
-      ]
+      "includeFiles": "{index.html,split.html,merge.html,styles.css,app.js,split.js,merge.js,menu.js,rain-bg.js,service-worker.js,manifest.webmanifest,robots.txt,sitemap.xml,google1169d12d3b7ad281.html,assets/**}"
     }
   },
   "rewrites": [
